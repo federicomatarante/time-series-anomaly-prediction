@@ -22,7 +22,8 @@ class INIConfigReader(ConfigReader):
         [database]
         host = localhost
         port = 5432
-        username = admin
+        username = admin ; Comments also this way!
+        restricted = true
 
         [api]
         url = https://api.example.com
@@ -60,9 +61,8 @@ class INIConfigReader(ConfigReader):
         Load the configuration from the INI file\
         :raises configparser.Error: If there's an error parsing the INI file
         """
-        parser = configparser.ConfigParser()
+        parser = configparser.ConfigParser(inline_comment_prefixes=(';',))
         parser.read(self.config_path)
-
         config_data = {}
         for section in parser.sections():
             config_data[section] = dict(parser[section])

@@ -77,6 +77,7 @@ class TestConfigReader(unittest.TestCase):
             v_type=int,
             collection_type=list
         )
+
         self.assertIsInstance(ports_list, list)
         self.assertEqual(ports_list, [80, 443, 8080])
 
@@ -140,4 +141,3 @@ class TestConfigReader(unittest.TestCase):
         for path in invalid_paths:
             with self.assertRaises(ValueError):
                 self.config_reader.get_param(path)
-
