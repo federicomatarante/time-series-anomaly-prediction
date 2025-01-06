@@ -58,18 +58,20 @@ class ESADataset(Dataset):
         ], axis=1)
         first_index = self.channels.index[0]
         second_index = self.channels.index[1]
+        self.length = self.channels.loc[first_index]
         self.delta_index = second_index - first_index
         self.start_time = first_index
     
     def __len__(self):
-        return len(self.channels)
+        return self.length
     
     def __getitem__(self, idx):
-        print(idx)
         start_index = self.start_time + self.delta_index*idx*self.stride
         end_index = start_index + self.delta_index*self.window_size
         start_horizon_index = end_index + self.delta_index
-        end_horizon_index = start_horizon_index + self.horizon_size*self.delta_index
-        return {"signals": torch.from_numpy(self.channels.loc[start_index:end_index].to_numpy()),
-                "labels": torch.from_numpy(self.anomalies.loc[start_horizon_index:end_horizon_index].to_numpy())}
+        end_horizon_index = start_horizon_index + self.delta_index*self.horizon_size
+        return {
+            "signals": torch.from_numpy(self.channels.loc[start_index:end_index].to_numpy()),
+            "labels": torch.from_numpy(self.anomalies.loc[start_horizon_index:end_horizon_index].to_numpy())
+        }
 
