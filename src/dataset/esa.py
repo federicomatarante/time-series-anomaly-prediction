@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 from typing import Union
-
+import numpy as np
 
 
 class ESADataset(Dataset):
@@ -70,8 +70,13 @@ class ESADataset(Dataset):
         end_index = start_index + self.delta_index*self.window_size
         start_horizon_index = end_index + self.delta_index
         end_horizon_index = start_horizon_index + self.delta_index*self.horizon_size
+        labels = np.array([
+            1.0 if any([ True if i == 1.0 else False for i in x ]) else 0.0
+            for x in self.anomalies.loc[start_horizon_index:end_horizon_index].to_numpy()
+        ])
+        
         return {
             "signals": torch.from_numpy(self.channels.loc[start_index:end_index].to_numpy()),
-            "labels": torch.from_numpy(self.anomalies.loc[start_horizon_index:end_horizon_index].to_numpy())
+            "labels": torch.from_numpy(labels)
         }
 
