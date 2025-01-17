@@ -47,14 +47,14 @@ class INIConfigReader(ConfigReader):
         default_value = config.get_param("database.default", default=None)
     """
 
-    def __init__(self, config_path: Union[str, Path]):
+    def __init__(self, config_path: Union[str, Path], base_path: Path = Path('')):
         self.config_path = Path(config_path)
         if not self.config_path.exists():
             raise FileNotFoundError(f"Configuration file not found: {self.config_path}")
 
         if self.config_path.suffix.lower() != '.ini':
             raise ValueError(f"File must be an INI file, got: {self.config_path.suffix}")
-        super().__init__(self._load_config())
+        super().__init__(self._load_config(),base_path)
 
     def _load_config(self) -> dict[str, dict[str, str]]:
         """

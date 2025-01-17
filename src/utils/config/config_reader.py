@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Optional, Dict, Any
 
 
@@ -65,12 +66,32 @@ class ConfigReader:
          db_config = config['database']
     """
 
-    def __init__(self, config_data: Dict):
+    def __init__(self, config_data: Dict, base_path: Path = Path('')):
         """
         Initialize the ConfigReader with configuration data\
         :param config_data: Dictionary containing the configuration data organized in sections
         """
         self.config_data = config_data
+        self.base_path = base_path
+
+    def _convert_type(self, data: str, v_type: type, param_path: str, default=None):
+        allowed_types = (float, int, str, bool, Path)
+        if v_type and v_type not in allowed_types:
+            raise ValueError(f"v_type must be between the following categories: {allowed_types}")
+        try:
+            # Special handling for bool type since bool('False') == True
+            if v_type is bool:
+                return data.lower() == 'true'
+            elif v_type is Path:
+                return self.base_path / Path(data)
+            else:
+                return v_type(data)
+        except (ValueError, TypeError):
+            if default is None:
+                raise TypeError(
+                    f"Type conversion failed for param {param_path}. Got type {type(data)}, expected: {v_type}")
+            else:
+                return default
 
     def get_param(self, param_path: str, default: Any = None, v_type: type = None, nullable=False) -> Any:
         """
@@ -109,9 +130,7 @@ class ConfigReader:
             # Null values
             timeout = config.get_param('server.timeout', nullable=True)  # Returns: None
         """
-        allowed_types = (float, int, str, bool)
-        if v_type and v_type not in allowed_types:
-            raise ValueError(f"v_type must be between the following categories: {allowed_types}")
+
         try:
             section, param = param_path.rsplit('.', 1)
             data = self.config_data[section][param]
@@ -120,19 +139,7 @@ class ConfigReader:
                     return None
                 raise ValueError(f"Parameter {param_path} cannot be a null value!")
             if v_type is not None:
-                try:
-                    # Special handling for bool type since bool('False') == True
-                    if v_type is bool and isinstance(data, str):
-                        data = data.lower() == 'true'
-                    else:
-                        data = v_type(data)
-                except (ValueError, TypeError):
-                    if default is None:
-                        raise TypeError(
-                            f"Type conversion failed for param {param_path}. Got type {type(data)}, expected: {v_type}")
-                    else:
-                        return default
-
+                data = self._convert_type(data, v_type, param_path, default)
             return data
         except (KeyError, ValueError) as e:
             if default is None:
@@ -200,12 +207,7 @@ class ConfigReader:
                         f"Parameter {param_path} must be a collection of {num_elems}. {len(data)} elements found instead!!")
                 if not v_type:
                     return collection_type(data)
-                allowed_v_types = (float, int, str, bool)
-                if v_type and v_type not in allowed_v_types:
-                    raise ValueError(f"Parameter {param_path}:"
-                                     f"v_type must be between the following categories: {allowed_v_types}")
-                return collection_type(v_type(sample) for sample in data) if v_type != bool else collection_type(
-                    sample.lower() == 'true' for sample in data)
+                return collection_type(self._convert_type(sample, v_type, param_path, default) for sample in data)
         except (KeyError, ValueError) as e:
             if default is None:
                 raise ValueError(f"Parameter {param_path} not found and no default value provided") from e

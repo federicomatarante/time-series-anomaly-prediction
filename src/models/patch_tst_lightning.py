@@ -2,6 +2,7 @@ from typing import Tuple
 
 import pytorch_lightning as pl
 from torch import nn
+from torch.utils.data import Dataset
 
 from src.patchtst.models.PatchTST import Model as PatchTST
 from src.trainings.utils.anomaly_prediction_metrics import ExistenceOfAnomaly, DensityOfAnomalies, LeadTime, DiceScore
@@ -84,15 +85,16 @@ class PatchTSTLightning(pl.LightningModule):
         self.test_dice = DiceScore(threshold=test_threshold)
 
         # Setup classifier
+        self.context_window = model_config_reader.get_param('seq.len', v_type=int)
         layers_sizes = model_config_reader.get_collection('classifier.layers_sizes', v_type=int,
                                                           collection_type=tuple)
-        window_size = model_config_reader.get_param('classifier.window_size', v_type=int)
+        self.window_size = model_config_reader.get_param('classifier.window_size', v_type=int)
         hidden_act = model_config_reader.get_param('classifier.activation.hidden', v_type=str)
         output_act = model_config_reader.get_param('classifier.activation.output', v_type=str)
         dropout = model_config_reader.get_param('dropout.classifier', v_type=float)
-        channels = model_config_reader.get_param('data.enc_in', v_type=int)
+        self.channels = model_config_reader.get_param('data.enc_in', v_type=int)
         pred_len = model_config_reader.get_param('pred.len', v_type=int)
-        self._setup_classifier(layers_sizes, window_size, hidden_act, output_act, dropout, channels * pred_len)
+        self._setup_classifier(layers_sizes, self.window_size, hidden_act, output_act, dropout, pred_len, self.channels)
         # Save hyperparameters
 
     def _setup_classifier(self,
@@ -101,7 +103,8 @@ class PatchTSTLightning(pl.LightningModule):
                           hidden_act: str,
                           output_act: str,
                           dropout_rate: int,
-                          encoder_output_size: int
+                          pred_len: int,
+                          channels: int
                           ):
         """
         Sets up the classifier network for anomaly prediction.
@@ -119,7 +122,7 @@ class PatchTSTLightning(pl.LightningModule):
         dropout = nn.Dropout(p=dropout_rate)
 
         layers = []
-
+        encoder_output_size = pred_len * channels
         for size in layers_sizes:
             layers.extend([
                 nn.Linear(encoder_output_size, size),
@@ -129,7 +132,7 @@ class PatchTSTLightning(pl.LightningModule):
             encoder_output_size = size
 
         layers.extend([
-            nn.Linear(encoder_output_size, window_size),
+            nn.Linear(encoder_output_size, channels * window_size),
             output_activation
         ])
 
@@ -140,6 +143,7 @@ class PatchTSTLightning(pl.LightningModule):
         Forward pass of the model.
 
         :param x: Input tensor of shape (batch_size, sequence_length, features)
+        # TODO change x sape
         :return: Predicted anomaly scores of shape (batch_size, window_size)
 
         Example:
@@ -147,10 +151,28 @@ class PatchTSTLightning(pl.LightningModule):
              output = model(x)
              print(output.shape)  # torch.Size([32, window_size])
         """
+        x = x.transpose(2, 1)
         x = self.encoder(x)
+        x = x.transpose(2, 1)
         x = x.flatten(-2, -1)
         x = self.classifier(x)
-        return x.squeeze(-1)
+        x = x.squeeze(-1)
+        batch_size = x.shape[0]
+        return x.view(batch_size, self.channels,
+                      self.window_size)  # Ridimensiona in (batch_size, channels, window_size)
+
+    # TODO make variables private
+    def check_compatibility(self, dataset: Dataset):  # TODO document
+        if len(dataset) == 0:  # TODO ?
+            raise ValueError("Dataset is empty!")
+        signal, output = dataset[0]
+        signal_shape, output_shape = signal.shape, output.shape
+        if len(signal_shape) != 2 or signal_shape[0] != self.channels or signal_shape[1] != self.context_window:
+            raise ValueError(
+                f"Wrong input shape! Expected: (channels,context_window) = ({self.channels},{self.context_window}). Found: ({signal_shape})")
+        if len(output_shape) != 2 or output_shape[0] != self.channels or output_shape[1] != self.window_size:
+            raise ValueError(
+                f"Wrong output shape! Expected: (channels,context_window) = ({self.channels},{self.window_size}). Found: ({output_shape})")
 
     def training_step(self, batch, batch_idx):
         x, y = batch

@@ -258,7 +258,8 @@ class PatchTSTTrainer:
             accelerator=accelerator,
             devices=devices,
             deterministic=True,
-            gradient_clip_val=self.gradient_clip_value
+            gradient_clip_val=self.gradient_clip_value,
+
         )
 
         return trainer
@@ -278,6 +279,9 @@ class PatchTSTTrainer:
              print(f"Best model score: {results['best_model_score']}")
              print(f"Trained for {results['trained_epochs']} epochs")
         """
+        # Check compatibility
+        self.model.check_compatibility(self.train_dataset)
+
         # Setup dataloaders
         train_loader, val_loader = self._setup_dataloaders()
 

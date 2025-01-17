@@ -13,7 +13,7 @@ def wasserstein_distance(y_pred: tensor, y_true: tensor) -> tensor:
     :raises ValueError: If input tensors don't have 2 or 3 dimensions, shapes don't match, or 3rd dimension isn't 1
     """
 
-    # Handle 3D tensors
+    """# Handle 3D tensors
     if len(y_pred.shape) == 3:
         if y_pred.size(2) != 1:
             raise ValueError("For 3D tensors, the last dimension must be 1")
@@ -27,8 +27,8 @@ def wasserstein_distance(y_pred: tensor, y_true: tensor) -> tensor:
     # After potential squeezing, tensors should be 2D
     if len(y_pred.shape) != 2 or len(y_true.shape) != 2:
         raise ValueError(
-            "Input tensors must be 2-dimensional (batch_size, sequence_length) or 3-dimensional (batch_size, sequence_length, 1)")
-
+            "Input tensors must be 2-dimensional (batch_size, sequence_length) or 3-dimensional (batch_size, sequence_length, 1)")"""
+    # TODO shape check
     if y_true.shape != y_pred.shape:
         raise ValueError(f"Shape mismatch: y_pred shape {y_pred.shape} != y_true shape {y_true.shape}")
 
@@ -36,7 +36,6 @@ def wasserstein_distance(y_pred: tensor, y_true: tensor) -> tensor:
 
     # Initialize sum for accumulating distances
     total_distance = 0.0
-
     # Iterate over i from 1 to T
     for i in range(1, T + 1):
         # Calculate cumulative sums up to index i for both sequences
@@ -54,7 +53,6 @@ def wasserstein_distance(y_pred: tensor, y_true: tensor) -> tensor:
 
     # Apply final scaling factor
     wasserstein = (2 / (T * (T + 1))) * total_distance
-
     return wasserstein
 
 

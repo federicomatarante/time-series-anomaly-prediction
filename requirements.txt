@@ -1,6 +1,6 @@
 torch~=2.5.1
 numpy~=2.2.1
-scikit-learn
+sklearn
 pandas~=2.2.3
 pytorch_lightning
 tqdm~=4.67.1
