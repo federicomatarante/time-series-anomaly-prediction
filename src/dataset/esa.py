@@ -69,8 +69,8 @@ class ESADataset(Dataset):
         start_horizon_index = end_index + self.delta_index
         end_horizon_index = start_horizon_index + self.delta_index*self.horizon_size
         
-        return {
-            "signals": torch.from_numpy(self.channels.loc[start_index:end_index].to_numpy()).transpose(1,0),
-            "labels": self.anomalies.loc[start_horizon_index:end_horizon_index].to_numpy().transpose(1,0)
-        }
+        return (
+            torch.from_numpy(self.channels.loc[start_index:end_index].to_numpy(dtype=np.float32)).transpose(1,0),
+            self.anomalies.loc[start_horizon_index:end_horizon_index].to_numpy(dtype=np.float32).transpose(1,0)
+        )
 
