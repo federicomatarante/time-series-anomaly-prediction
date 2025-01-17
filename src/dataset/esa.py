@@ -36,14 +36,12 @@ class ESADataset(Dataset):
                 ds_type: str,
                 window_size: int = 2,
                 horizon_size: int = 2,
-                stride:int = 3):
+                stride:int = 1):
         self.window_size = window_size
         self.horizon_size = horizon_size
         self.stride = stride
         self.delta_t_x = None
         self.delta_t_y = None
-        if period not in ["10_months", "3_months"]:
-            raise ValueError("Period must be either '10_months' or '3_months'")
         if isinstance(mission, int):
             mission = str(mission)
         self.dataset = pd.read_csv(f"{folder}/ESA-Mission{mission}/{period}.{ds_type}.csv")
