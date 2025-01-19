@@ -28,17 +28,16 @@ class ExistenceOfAnomaly(Metric):
         """
         Update metric states from batch of predictions and targets.
 
-        :param preds: Model predictions [batch_size, window_size]
-        :param targets: Ground truth labels [batch_size, window_size]
+        :param preds: Model predictions [batch_size, channels, window_size]
+        :param targets: Ground truth labels [batch_size, channels, window_size]
         :raises ValueError: If inputs have incorrect shapes
         """
-        """if len(preds.shape) != 2 or preds.shape != targets.shape:
+        if len(preds.shape) != 3 or preds.shape != targets.shape:
             raise ValueError(
-                f"Inputs must be 2D tensors of shape [batch_size, window_size]. "
-                f"Got predictions shape {preds.shape} and targets shape {targets.shape}")"""
-        # TODO check shape
-        preds = preds.flatten(0, 1)
-        targets = targets.flatten(0, 1)
+                f"Inputs must be 2D tensors of shape [batch_size, channels, window_size]. "
+                f"Got predictions shape {preds.shape} and targets shape {targets.shape}")
+        preds = preds.flatten()
+        targets = targets.flatten()
         # Check existence of anomalies in each sequence
         pred_exists = (preds >= self.threshold)
         target_exists = (targets >= self.threshold)
@@ -85,19 +84,19 @@ class DensityOfAnomalies(Metric):
         """
         Update metric states from batch of predictions and targets.
 
-        :param preds: Model predictions [batch_size, window_size]
-        :param targets: Ground truth labels [batch_size, window_size]
+        :param preds: Model predictions [batch_size, channels, window_size]
+        :param targets: Ground truth labels [batch_size,  channels, window_size]
         :raises ValueError: If inputs have incorrect shapes
         """
-        """if len(preds.shape) != 2 or preds.shape != targets.shape:
+        if len(preds.shape) != 3 or preds.shape != targets.shape:
             raise ValueError(
-                f"Inputs must be 2D tensors of shape [batch_size, window_size]. "
-                f"Got predictions shape {preds.shape} and targets shape {targets.shape}")"""
-        # TODO check shape
+                f"Inputs must be 3D tensors of shape [batch_size, channels, window_size]. "
+                f"Got predictions shape {preds.shape} and targets shape {targets.shape}")
 
         # Compute density difference for each sequence in batch
-        self.cumulative_density += torch.sum(torch.abs(torch.sum(targets - preds, dim=1)))
-        self.total += targets.numel()
+        _, C, T = preds.shape
+        self.cumulative_density += torch.sum(torch.abs(torch.sum(targets - preds, dim=(1, 2))))
+        self.total += C * T
 
     def compute(self) -> float:
         """
@@ -105,7 +104,6 @@ class DensityOfAnomalies(Metric):
 
         :return: Score between 0 and 1
         """
-
         return 1 - self.cumulative_density / self.total
 
 
@@ -123,42 +121,37 @@ class LeadTime(Metric):
         super().__init__(**kwargs)
         self.threshold = threshold
         self.add_state("cumulative_distance", default=torch.tensor(0.0), dist_reduce_fx="sum")
-        self.add_state("valid_sequences", default=torch.tensor(0), dist_reduce_fx="sum")
         self.add_state("total_length", default=torch.tensor(0), dist_reduce_fx="sum")
 
     def reset(self) -> None:
         """Reset metric states to initial values."""
         self.cumulative_distance.zero_()
-        self.valid_sequences.zero_()
         self.total_length.zero_()
 
     def update(self, preds: Tensor, targets: Tensor) -> None:
         """
         Update metric states from batch of predictions and targets.
 
-        :param preds: Model predictions [batch_size, window_size]
-        :param targets: Ground truth labels [batch_size, window_size]
+        :param preds: Model predictions [batch_size, channels, window_size]
+        :param targets: Ground truth labels [batch_size, channels, window_size]
         :raises ValueError: If inputs have incorrect shapes
         """
-        """if len(preds.shape) != 2 or preds.shape != targets.shape:
+        if len(preds.shape) != 3 or preds.shape != targets.shape:
             raise ValueError(
-                f"Inputs must be 2D tensors of shape [batch_size, window_size]. "
-                f"Got predictions shape {preds.shape} and targets shape {targets.shape}")"""
-        # TODO check shape
+                f"Inputs must be 3D tensors of shape [batch_size, channels, window_size]. "
+                f"Got predictions shape {preds.shape} and targets shape {targets.shape}")
 
-        batch_size, window_size = preds.shape
-        self.total_length += window_size
+        batch_size, channels, window_size = preds.shape
+        self.total_length += window_size * channels
 
         for i in range(batch_size):
             pred_indices = torch.nonzero(preds[i] >= self.threshold)
             target_indices = torch.nonzero(targets[i] >= self.threshold)
-
             if len(pred_indices) > 0 and len(target_indices) > 0:
                 # Get first occurrence of anomaly in both sequences
                 first_pred = pred_indices[0]
                 first_target = target_indices[0]
-                self.cumulative_distance += torch.abs(first_pred - first_target).item()
-                self.valid_sequences += 1
+                self.cumulative_distance += torch.sum(torch.abs(first_pred - first_target)).item()
 
     def compute(self) -> float:
         """
@@ -166,9 +159,8 @@ class LeadTime(Metric):
 
         :return: Score between 0 and 1, or inf if no valid sequences found
         """
-        if self.valid_sequences == 0:
-            return math.inf
-        return 1 - self.cumulative_distance / (self.valid_sequences * self.total_length)
+
+        return 1 - self.cumulative_distance / self.total_length
 
 
 class DiceScore(Metric):
@@ -199,16 +191,14 @@ class DiceScore(Metric):
         """
         Update metric states from batch of predictions and targets.
 
-        :param preds: Model predictions [batch_size, window_size]
-        :param targets: Ground truth labels [batch_size, window_size]
+        :param preds: Model predictions [batch_size, channels, window_size]
+        :param targets: Ground truth labels [batch_size, channels, window_size]
         :raises ValueError: If inputs have incorrect shapes
         """
-        """if len(preds.shape) != 2 or preds.shape != targets.shape:
+        if len(preds.shape) != 3 or preds.shape != targets.shape:
             raise ValueError(
-                f"Inputs must be 2D tensors of shape [batch_size, window_size]. "
-                f"Got predictions shape {preds.shape} and targets shape {targets.shape}")"""
-        # TODO check shape
-
+                f"Inputs must be 2D tensors of shape [batch_size, channels, window_size]. "
+                f"Got predictions shape {preds.shape} and targets shape {targets.shape}")
         pred_mask = preds >= self.threshold
         target_mask = targets >= self.threshold
 

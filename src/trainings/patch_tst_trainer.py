@@ -178,7 +178,8 @@ class PatchTSTTrainer:
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             shuffle=False,
-            pin_memory=True
+            pin_memory=True,
+            persistent_workers=True
         )
 
         val_loader = DataLoader(
@@ -186,7 +187,8 @@ class PatchTSTTrainer:
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             shuffle=False,
-            pin_memory=True
+            pin_memory=True,
+            persistent_workers=True
         )
 
         return train_loader, val_loader
