@@ -8,7 +8,7 @@ from src.utils.config.ini_config_reader import INIConfigReader
 
 
 def main():
-    configs_path = Path('../configs')
+    configs_path = Path('./configs')
     dataset_config = INIConfigReader(configs_path / 'esa.ini')
     patch_tst_config = INIConfigReader(configs_path / 'patchtst.ini')
     training_config = INIConfigReader(configs_path / 'training.ini')

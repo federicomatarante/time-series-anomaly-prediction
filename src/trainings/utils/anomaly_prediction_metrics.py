@@ -141,8 +141,8 @@ class LeadTime(Metric):
                 f"Inputs must be 3D tensors of shape [batch_size, channels, window_size]. "
                 f"Got predictions shape {preds.shape} and targets shape {targets.shape}")
 
-        batch_size, channels, window_size = preds.shape
-        self.total_length += window_size * channels
+        batch_size, window_size , timesteps= preds.shape
+        self.total_length += window_size
 
         for i in range(batch_size):
             pred_indices = torch.nonzero(preds[i] >= self.threshold)

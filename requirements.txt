@@ -1,8 +1,9 @@
 torch~=2.5.1
 numpy~=2.2.1
-sklearn
+scikit-learn
 pandas~=2.2.3
 pytorch_lightning
 tqdm~=4.67.1
 sympy~=1.13.1
 torchmetrics~=1.6.1
+tensorboard
