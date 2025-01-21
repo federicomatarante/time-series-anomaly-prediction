@@ -1,4 +1,7 @@
-torch~=2.5.1
+--find-links https://download.pytorch.org/whl/cu118
+torch==2.1.0+cu118
+torchvision==0.16.1+cu118
+torchaudio==2.1.0+cu118
 numpy~=2.2.1
 scikit-learn
 pandas~=2.2.3

@@ -12,6 +12,20 @@ from src.models.patch_tst_lightning import PatchTSTLightning
 from src.utils.config.config_reader import ConfigReader
 
 
+def collate_batch(batch):
+    """
+    Collate function for DataLoader that stacks inputs and targets.
+
+    Args:
+        batch: List of tuples (input, target)
+    Returns:
+        Tuple of (stacked_inputs, stacked_targets)
+    """
+    return (
+        torch.stack([x[0] for x in batch]),
+        torch.stack([x[1] for x in batch])
+    )
+
 class PatchTSTTrainer:
     """
     PatchTST model trainer that handles training, evaluation, and testing procedures.
@@ -122,7 +136,7 @@ class PatchTSTTrainer:
                                                              nullable=True)
 
         # Setup checkpoints
-        self.checkpoint_dir = training_config.get_param('model_checkpoint.save_directory', v_type=str)
+        self.checkpoint_dir = training_config.get_param('model_checkpoint.save_directory', v_type=Path)
         self.checkpoint_file_name = training_config.get_param('model_checkpoint.filename', v_type=str)
         self.checkpoint_monitor = training_config.get_param('model_checkpoint.monitor', v_type=str)
         self.checkpoint_mode = training_config.get_param('model_checkpoint.mode', v_type=str)
@@ -141,7 +155,7 @@ class PatchTSTTrainer:
         self.hardware_accelerator = training_config.get_param('hardware.accelerator', v_type=str)
 
         # Setup directories
-        self.log_dir = training_config.get_param('logging.save_directory', v_type=str)
+        self.log_dir = training_config.get_param('logging.save_directory', v_type=Path)
         os.makedirs(self.checkpoint_dir, exist_ok=True)
         os.makedirs(self.log_dir, exist_ok=True)
 
@@ -174,11 +188,7 @@ class PatchTSTTrainer:
              next(iter(train_loader))  # Get first batch
         """
         
-        def _collate(batch):
-            return (
-                torch.stack([ x[0] for x in batch ]),
-                torch.stack([ x[1] for x in batch ])
-            )
+
         
         train_loader = DataLoader(
             self.train_dataset,
@@ -187,7 +197,7 @@ class PatchTSTTrainer:
             shuffle=False,
             pin_memory=True,
             persistent_workers=True,
-            collate_fn=_collate,
+            collate_fn=collate_batch,
             
         )
 
@@ -198,7 +208,7 @@ class PatchTSTTrainer:
             shuffle=False,
             pin_memory=True,
             persistent_workers=True,
-            collate_fn=_collate
+            collate_fn=collate_batch
         )
 
         return train_loader, val_loader
@@ -270,7 +280,6 @@ class PatchTSTTrainer:
             accelerator=accelerator,
             devices=devices,
             deterministic=False,
-            # deterministic=True,
             gradient_clip_val=self.gradient_clip_value,
 
         )

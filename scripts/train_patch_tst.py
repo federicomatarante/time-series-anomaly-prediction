@@ -1,61 +1,41 @@
+import os
 from pathlib import Path
 
-import torch
-from torch.utils.data import random_split
-import tqdm
+from torch.utils.data import Subset
 
 from src.dataset.esa import ESADataset
 from src.trainings.patch_tst_trainer import PatchTSTTrainer
 from src.utils.config.ini_config_reader import INIConfigReader
-from torch.utils.data import DataLoader, Subset
 
 
 def main():
-    configs_path = Path('./configs')
-    dataset_config = INIConfigReader(configs_path / 'esa.ini')
-    patch_tst_config = INIConfigReader(configs_path / 'patchtst.ini')
-    training_config = INIConfigReader(configs_path / 'training.ini')
+    base_dir = Path(__file__).parent.parent
+
+    logs_dir = base_dir / Path('logs/patch_tst_training')
+    os.makedirs(logs_dir, exist_ok=True)
+    configs_dir = base_dir / Path('configs')
+
+    dataset_config = INIConfigReader(configs_dir / 'esa.ini', base_path=base_dir)
+    patch_tst_config = INIConfigReader(configs_dir / 'patchtst.ini', base_path=logs_dir)
+    training_config = INIConfigReader(configs_dir / 'training.ini', base_path=logs_dir)
+
     dataset_args = {
         'folder': dataset_config.get_param('dataset.folder', v_type=Path),
         'mission': dataset_config.get_param('dataset.mission', v_type=str),
         'period': dataset_config.get_param('dataset.period', v_type=str),
-        'ds_type': dataset_config.get_param('dataset.type', v_type=str),
-        'window_size': dataset_config.get_param('windows.window_size', v_type=int),
+        'ds_type': dataset_config.get_param('dataset.type', v_type=str, domain={'train', 'val', 'test'}),
+        'window_size': dataset_config.get_param('windows.prediction_size', v_type=int),
         'horizon_size': dataset_config.get_param('windows.horizon_size', v_type=int),
         'stride': dataset_config.get_param('windows.stride', v_type=int),
     }
+    split_ratio = dataset_config.get_param('dataset.train_split', v_type=float)
+
     dataset = ESADataset(**dataset_args)
     dataset_size = len(dataset)
-    train_size = int(0.9 * dataset_size)
+    train_size = int(split_ratio * dataset_size)
 
     train_dataset = Subset(dataset, range(train_size))
     valid_dataset = Subset(dataset, range(train_size, len(dataset)))
-
-    
-    train_loader = DataLoader(
-            train_dataset,
-            batch_size=32,
-            num_workers=1,
-            shuffle=False,
-            pin_memory=True,
-            persistent_workers=True,
-            drop_last=True
-            # collate_fn=_collate,
-    )
-
-    valid_loader = DataLoader(
-            valid_dataset,
-            batch_size=1,
-            num_workers=1,
-            shuffle=False,
-            pin_memory=True,
-            persistent_workers=True,
-            drop_last=True
-            # collate_fn=_collate,
-    )
-
-    # for X, y in tqdm.tqdm(train_loader):
-    #     continue
 
     trainer = PatchTSTTrainer(
         model_config=patch_tst_config,
@@ -69,5 +49,4 @@ def main():
 
 
 if __name__ == '__main__':
-    # TODO path of ini files from directory
     main()
