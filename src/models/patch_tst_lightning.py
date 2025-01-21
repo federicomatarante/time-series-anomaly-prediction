@@ -86,15 +86,15 @@ class PatchTSTLightning(pl.LightningModule):
 
         # Setup classifier
         self.context_window = model_config_reader.get_param('seq.len', v_type=int)
-        layers_sizes = model_config_reader.get_collection('classifier.layers_sizes', v_type=int,
+        self.layers_sizes = model_config_reader.get_collection('classifier.layers_sizes', v_type=int,
                                                           collection_type=tuple)
         self.window_size = model_config_reader.get_param('classifier.window_size', v_type=int)
-        hidden_act = model_config_reader.get_param('classifier.activation.hidden', v_type=str)
-        output_act = model_config_reader.get_param('classifier.activation.output', v_type=str)
-        dropout = model_config_reader.get_param('dropout.classifier', v_type=float)
+        self.hidden_act = model_config_reader.get_param('classifier.activation.hidden', v_type=str)
+        self.output_act = model_config_reader.get_param('classifier.activation.output', v_type=str)
+        self.dropout = model_config_reader.get_param('dropout.classifier', v_type=float)
         self.channels = model_config_reader.get_param('data.enc_in', v_type=int)
-        pred_len = model_config_reader.get_param('pred.len', v_type=int)
-        self._setup_classifier(layers_sizes, self.window_size, hidden_act, output_act, dropout, pred_len, self.channels)
+        self.pred_len = model_config_reader.get_param('pred.len', v_type=int)
+        self._setup_classifier(self.layers_sizes, self.window_size, self.hidden_act, self.output_act, self.dropout, self.pred_len, self.channels)
         # Save hyperparameters
 
     def _setup_classifier(self,
@@ -265,13 +265,13 @@ class PatchTSTLightning(pl.LightningModule):
         # Save model configurations
         checkpoint['model_config'] = {
             # Architecture parameters
-            'layers_sizes': self.encoder.layers_sizes,
-            'window_size': self.encoder.window_size,
-            'hidden_act': self.encoder.hidden_act,
-            'output_act': self.encoder.output_act,
-            'dropout': self.encoder.dropout,
-            'channels': self.encoder.channels,
-            'pred_len': self.encoder.pred_len,
+            'layers_sizes': self.layers_sizes,
+            'window_size': self.window_size,
+            'hidden_act': self.hidden_act,
+            'output_act': self.output_act,
+            'dropout': self.dropout,
+            'channels': self.channels,
+            'pred_len': self.pred_len,
 
             # Other model-specific parameters
             'threshold': self.train_existence.threshold,

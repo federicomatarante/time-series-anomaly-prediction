@@ -160,7 +160,7 @@ class PatchTSTTrainer:
             self.checkpoint_path = None
             self.model = PatchTSTLightning(
                 model_config_reader=model_config,
-                training_config_reader=training_config
+                training_config_reader=training_config,
             )
 
     def _setup_dataloaders(self) -> tuple[DataLoader, DataLoader]:
@@ -173,13 +173,22 @@ class PatchTSTTrainer:
              train_loader, val_loader = trainer._setup_dataloaders()
              next(iter(train_loader))  # Get first batch
         """
+        
+        def _collate(batch):
+            return (
+                torch.stack([ x[0] for x in batch ]),
+                torch.stack([ x[1] for x in batch ])
+            )
+        
         train_loader = DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             shuffle=False,
             pin_memory=True,
-            persistent_workers=True
+            persistent_workers=True,
+            collate_fn=_collate,
+            
         )
 
         val_loader = DataLoader(
@@ -188,7 +197,8 @@ class PatchTSTTrainer:
             num_workers=self.num_workers,
             shuffle=False,
             pin_memory=True,
-            persistent_workers=True
+            persistent_workers=True,
+            collate_fn=_collate
         )
 
         return train_loader, val_loader
@@ -259,7 +269,8 @@ class PatchTSTTrainer:
             logger=logger,
             accelerator=accelerator,
             devices=devices,
-            deterministic=True,
+            deterministic=False,
+            # deterministic=True,
             gradient_clip_val=self.gradient_clip_value,
 
         )
