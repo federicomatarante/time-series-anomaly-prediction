@@ -1,3 +1,4 @@
 {
     "jupyter.notebookFileRoot": "${workspaceFolder}/src",
+    // "python.defaultInterpreterPath": "/opt/miniconda/envs/deep-learning/bin/python"
 }
