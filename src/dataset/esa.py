@@ -67,9 +67,10 @@ class ESADataset(Dataset):
     
     def __getitem__(self, idx):
         start_index = self.start_time + self.delta_index*idx
-        end_index = start_index + self.delta_index*self.window_size
+        end_index = start_index + self.delta_index*(self.window_size - 1)
+
         start_horizon_index = end_index + self.delta_index
-        end_horizon_index = start_horizon_index + self.delta_index*self.horizon_size
+        end_horizon_index = start_horizon_index + self.delta_index*(self.horizon_size - 1)
         
         signals = torch.from_numpy(self.channels.loc[start_index:end_index].to_numpy(dtype=np.float32)).transpose(1,0)
         if signals.shape[1] < self.window_size:

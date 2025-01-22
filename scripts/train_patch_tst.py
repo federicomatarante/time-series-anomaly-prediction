@@ -24,10 +24,11 @@ def main():
         'mission': dataset_config.get_param('dataset.mission', v_type=str),
         'period': dataset_config.get_param('dataset.period', v_type=str),
         'ds_type': dataset_config.get_param('dataset.type', v_type=str, domain={'train', 'val', 'test'}),
-        'window_size': dataset_config.get_param('windows.prediction_size', v_type=int),
-        'horizon_size': dataset_config.get_param('windows.horizon_size', v_type=int),
+        'window_size': patch_tst_config.get_param('seq.len', v_type=int),
+        'horizon_size': patch_tst_config.get_param('pred.len', v_type=int),
         'stride': dataset_config.get_param('windows.stride', v_type=int),
     }
+    print(dataset_args)
     split_ratio = dataset_config.get_param('dataset.train_split', v_type=float)
 
     dataset = ESADataset(**dataset_args)
