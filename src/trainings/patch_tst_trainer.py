@@ -265,7 +265,7 @@ class PatchTSTTrainer:
         # Setup logger
         logger = TensorBoardLogger(
             save_dir=self.log_dir,
-            name=self.experiment_name
+            name=self.experiment_name,
         )
 
         # Get hardware acceleration config
@@ -281,7 +281,6 @@ class PatchTSTTrainer:
             devices=devices,
             deterministic=False,
             gradient_clip_val=self.gradient_clip_value,
-
         )
 
         return trainer
@@ -376,8 +375,8 @@ class PatchTSTTrainer:
             accelerator=self.hardware_accelerator,
             devices=self.hardware_num_devices,
             deterministic=True,
-            enable_checkpointing=False,
-            logger=False
+            enable_checkpointing=True,
+            logger=True
         )
 
         # Run test
