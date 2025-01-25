@@ -188,8 +188,6 @@ class PatchTSTTrainer:
              next(iter(train_loader))  # Get first batch
         """
         
-
-        
         train_loader = DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
