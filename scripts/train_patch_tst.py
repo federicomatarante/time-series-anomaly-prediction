@@ -6,9 +6,17 @@ from torch.utils.data import Subset
 from src.dataset.esa import ESADataset
 from src.trainings.patch_tst_trainer import PatchTSTTrainer
 from src.utils.config.ini_config_reader import INIConfigReader
+import argparse
+
+def get_args():
+    parser = argparse.ArgumentParser(description='Program that accepts a string argument')
+    parser.add_argument('--checkpoint', type=str, help='Input string to process', default=None)
+    args = parser.parse_args()
+    return args
 
 
 def main():
+    args = get_args()
     base_dir = Path(__file__).parent.parent
 
     logs_dir = base_dir / Path('logs/patch_tst_training')
@@ -37,6 +45,12 @@ def main():
 
     train_dataset = Subset(dataset, range(train_size))
     valid_dataset = Subset(dataset, range(train_size, len(dataset)))
+    # train_dataset = Subset(dataset, range(512))
+    # valid_dataset = Subset(dataset, range(512, 1024))
+
+    checkpoint = None
+    if args.checkpoint is not None:
+        checkpoint = f"{args.checkpoint}.ckpt"
 
     trainer = PatchTSTTrainer(
         model_config=patch_tst_config,
@@ -44,7 +58,7 @@ def main():
         train_dataset=train_dataset,
         val_dataset=valid_dataset,
         experiment_name='patchtst_training',
-        checkpoint_file=None,
+        checkpoint_file=checkpoint,
     )
     trainer.train()
 

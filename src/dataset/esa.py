@@ -84,6 +84,6 @@ class ESADataset(Dataset):
 
         return (
             signals,
-            labels
+            torch.where(labels == 1.0, 1.0, 0.0) # remove all labels with 2.0
         )
 

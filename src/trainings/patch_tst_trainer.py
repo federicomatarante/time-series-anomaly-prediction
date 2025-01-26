@@ -111,7 +111,7 @@ class PatchTSTTrainer:
             train_dataset: Dataset,
             val_dataset: Dataset,
             experiment_name: str = "patchtst_training",
-            checkpoint_file: str = None
+            checkpoint_file: Optional[str] = None
     ):
         """
         Initialize the PatchTST trainer.
@@ -206,7 +206,7 @@ class PatchTSTTrainer:
             shuffle=False,
             pin_memory=True,
             persistent_workers=True,
-            collate_fn=collate_batch
+            collate_fn=collate_batch,
         )
 
         return train_loader, val_loader
