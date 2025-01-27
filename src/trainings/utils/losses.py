@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch import tensor
 
 
-def wasserstein_distance(y_pred: tensor, y_true: tensor) -> tensor:
+def wasserstein_distance(y_pred: tensor, y_true: tensor, apply_scaling_factor=False) -> tensor:
     """
     Compute the Wasserstein distance between predicted and true time series.
     :param y_pred: Predicted time series tensor. Shape: (batch_size, channels, window_size)
@@ -38,7 +38,8 @@ def wasserstein_distance(y_pred: tensor, y_true: tensor) -> tensor:
         total_distance += distance_i.mean()
 
     # Apply final scaling factor
-    wasserstein = (2 / (T * C * (T * C + 1))) * total_distance
+    scaling = (2 / (T * C * (T * C + 1))) if apply_scaling_factor else 1
+    wasserstein = scaling * total_distance
     return wasserstein
 
 
@@ -51,11 +52,12 @@ class WassersteinLoss(nn.Module):
     3D tensors (batch_size, sequence_length, 1).
     """
 
-    def __init__(self):
+    def __init__(self, apply_scaling_factor=True):
         """
         Initialize the WassersteinLoss module.
         """
         super(WassersteinLoss, self).__init__()
+        self.apply_scaling_factor = apply_scaling_factor
 
     def forward(self, y_pred: tensor, y_true: tensor) -> tensor:
         """
@@ -104,4 +106,4 @@ class WassersteinLoss(nn.Module):
              loss_3d = criterion(pred_3d, true_3d)
              print(loss_3d)  # Example output: tensor(0.1123)
         """
-        return wasserstein_distance(y_pred, y_true)
+        return wasserstein_distance(y_pred, y_true, apply_scaling_factor=self.apply_scaling_factor)

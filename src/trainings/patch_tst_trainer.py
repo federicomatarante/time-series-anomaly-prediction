@@ -111,7 +111,7 @@ class PatchTSTTrainer:
             train_dataset: Dataset,
             val_dataset: Dataset,
             experiment_name: str = "patchtst_training",
-            checkpoint_file: str = None
+            checkpoint_file: Optional[str] = None
     ):
         """
         Initialize the PatchTST trainer.
@@ -188,8 +188,6 @@ class PatchTSTTrainer:
              next(iter(train_loader))  # Get first batch
         """
         
-
-        
         train_loader = DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
@@ -208,7 +206,7 @@ class PatchTSTTrainer:
             shuffle=False,
             pin_memory=True,
             persistent_workers=True,
-            collate_fn=collate_batch
+            collate_fn=collate_batch,
         )
 
         return train_loader, val_loader
@@ -265,7 +263,7 @@ class PatchTSTTrainer:
         # Setup logger
         logger = TensorBoardLogger(
             save_dir=self.log_dir,
-            name=self.experiment_name
+            name=self.experiment_name,
         )
 
         # Get hardware acceleration config
@@ -281,7 +279,6 @@ class PatchTSTTrainer:
             devices=devices,
             deterministic=False,
             gradient_clip_val=self.gradient_clip_value,
-
         )
 
         return trainer
@@ -376,8 +373,8 @@ class PatchTSTTrainer:
             accelerator=self.hardware_accelerator,
             devices=self.hardware_num_devices,
             deterministic=True,
-            enable_checkpointing=False,
-            logger=False
+            enable_checkpointing=True,
+            logger=True
         )
 
         # Run test

@@ -31,7 +31,7 @@ class PatchTSTLightning(pl.LightningModule):
                  training_config_reader: ConfigReader):
         super().__init__()
         self.encoder = PatchTST(model_config_reader)
-        self.loss_fn = WassersteinLoss()
+        self.loss_fn = WassersteinLoss(apply_scaling_factor=training_config_reader.get_param('training.loss_scaling_factor', v_type=bool))
         # Scheduler parameters
         self.scheduler_monitor = training_config_reader.get_param('scheduler.monitor', v_type=str)
         self.scheduler_frequency = training_config_reader.get_param('scheduler.frequency', v_type=int)
