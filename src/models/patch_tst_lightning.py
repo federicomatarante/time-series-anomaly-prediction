@@ -87,14 +87,15 @@ class PatchTSTLightning(pl.LightningModule):
         # Setup classifier
         self.context_window = model_config_reader.get_param('seq.len', v_type=int)
         self.layers_sizes = model_config_reader.get_collection('classifier.layers_sizes', v_type=int,
-                                                          collection_type=tuple)
+                                                               collection_type=tuple)
         self.window_size = model_config_reader.get_param('classifier.window_size', v_type=int)
         self.hidden_act = model_config_reader.get_param('classifier.activation.hidden', v_type=str)
         self.output_act = model_config_reader.get_param('classifier.activation.output', v_type=str)
         self.dropout = model_config_reader.get_param('dropout.classifier', v_type=float)
         self.channels = model_config_reader.get_param('data.enc_in', v_type=int)
         self.pred_len = model_config_reader.get_param('pred.len', v_type=int)
-        self._setup_classifier(self.layers_sizes, self.window_size, self.hidden_act, self.output_act, self.dropout, self.pred_len, self.channels)
+        self._setup_classifier(self.layers_sizes, self.window_size, self.hidden_act, self.output_act, self.dropout,
+                               self.pred_len, self.channels)
         # Save hyperparameters
 
     def _setup_classifier(self,
@@ -284,8 +285,8 @@ class PatchTSTLightning(pl.LightningModule):
             # Optimizer configuration
             'optimizer_type': self.optimizer_type,
             'optimizer_config': {
-                name: self.optimizer_config.get_section(f'optimizer.{name}')
-                for name in ['Adam', 'Adamw', 'SGD', 'RMSprop', 'Adadelta', 'Adagrad', 'RAdam']
+                'optimizer' + name: self.optimizer_config.get_section(f'optimizer{name}')
+                for name in ['', '.Adam', '.Adamw', '.SGD', '.RMSprop', '.Adadelta', '.Adagrad', '.RAdam']
             },
 
             # Scheduler configuration
@@ -293,9 +294,9 @@ class PatchTSTLightning(pl.LightningModule):
             'scheduler_monitor': self.scheduler_monitor,
             'scheduler_frequency': self.scheduler_frequency,
             'scheduler_config': {
-                name: self.scheduler_config.get_section(f'scheduler.{name}')
-                for name in ['ReduceLROnPlateau', 'StepLR', 'CosineAnnealingLR',
-                             'ExponentialLR', 'CosineAnnealingWarmRestarts', 'OneCycleLR']
+                "scheduler" + name: self.scheduler_config.get_section(f'scheduler{name}')
+                for name in ['', '.ReduceLROnPlateau', '.StepLR', '.CosineAnnealingLR',
+                             '.ExponentialLR', '.CosineAnnealingWarmRestarts', '.OneCycleLR']
             }
         }
 
