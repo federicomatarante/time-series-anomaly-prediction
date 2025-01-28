@@ -57,7 +57,7 @@ def main():
         training_config=training_config,
         train_dataset=train_dataset,
         val_dataset=valid_dataset,
-        experiment_name='patchtst_training',
+        experiment_name=training_config.get_param('model_checkpoint.experiment_name', v_type=str),
         checkpoint_file=checkpoint,
     )
     trainer.train()
