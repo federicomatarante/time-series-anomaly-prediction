@@ -64,13 +64,6 @@ class PatchTSTLightning(pl.LightningModule):
             }
         )
 
-        # Training metrics with configured threshold
-        threshold = training_config_reader.get_param('model.threshold', v_type=float)
-        self.train_existence = ExistenceOfAnomaly(threshold=threshold)
-        self.train_density = DensityOfAnomalies()
-        self.train_leadtime = LeadTime(threshold=threshold)
-        self.train_dice = DiceScore(threshold=threshold)
-
         # Validation metrics with configured threshold
         val_threshold = training_config_reader.get_param('metrics.val_metrics_threshold', v_type=float)
         self.val_existence = ExistenceOfAnomaly(threshold=val_threshold)
@@ -178,19 +171,6 @@ class PatchTSTLightning(pl.LightningModule):
         x, y = batch
         y_hat = self(x)
         loss = self.loss_fn(y_hat, y)
-
-        # Log metrics
-        self.train_existence(y_hat, y)
-        self.train_density(y_hat, y)
-        self.train_leadtime(y_hat, y)
-        self.train_dice(y_hat, y)
-
-        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
-        self.log('train_existence', self.train_existence, on_epoch=True)
-        self.log('train_density', self.train_density, on_epoch=True)
-        self.log('train_leadtime', self.train_leadtime, on_epoch=True)
-        self.log('train_dice', self.train_dice, on_epoch=True)
-
         return loss
 
     def validation_step(self, batch, batch_idx):
