@@ -31,7 +31,8 @@ class PatchTSTLightning(pl.LightningModule):
                  training_config_reader: ConfigReader):
         super().__init__()
         self.encoder = PatchTST(model_config_reader)
-        self.loss_fn = WassersteinLoss(apply_scaling_factor=training_config_reader.get_param('training.loss_scaling_factor', v_type=bool))
+        self.loss_fn = WassersteinLoss(
+            apply_scaling_factor=training_config_reader.get_param('training.loss_scaling_factor', v_type=bool))
         # Scheduler parameters
         self.scheduler_monitor = training_config_reader.get_param('scheduler.monitor', v_type=str)
         self.scheduler_frequency = training_config_reader.get_param('scheduler.frequency', v_type=int)
@@ -88,42 +89,36 @@ class PatchTSTLightning(pl.LightningModule):
         self.context_window = model_config_reader.get_param('seq.len', v_type=int)
         self.layers_sizes = model_config_reader.get_collection('classifier.layers_sizes', v_type=int,
                                                                collection_type=tuple)
-        self.window_size = model_config_reader.get_param('classifier.window_size', v_type=int)
         self.hidden_act = model_config_reader.get_param('classifier.activation.hidden', v_type=str)
         self.output_act = model_config_reader.get_param('classifier.activation.output', v_type=str)
         self.dropout = model_config_reader.get_param('dropout.classifier', v_type=float)
         self.channels = model_config_reader.get_param('data.enc_in', v_type=int)
         self.pred_len = model_config_reader.get_param('pred.len', v_type=int)
-        self._setup_classifier(self.layers_sizes, self.window_size, self.hidden_act, self.output_act, self.dropout,
-                               self.pred_len, self.channels)
+        self._setup_classifier(self.layers_sizes, self.hidden_act, self.output_act, self.dropout,
+                               self.pred_len)
         # Save hyperparameters
 
     def _setup_classifier(self,
                           layers_sizes: Tuple[int, ...],
-                          window_size: int,
                           hidden_act: str,
                           output_act: str,
                           dropout_rate: int,
                           pred_len: int,
-                          channels: int
                           ):
         """
         Sets up the classifier network for anomaly prediction.
 
         :param layers_sizes: Sizes of hidden layers in the classifier
-        :param window_size: Size of the prediction window
         :param hidden_act: Activation function name for hidden layers
         :param output_act: Activation function name for output layer
         :param dropout_rate: Dropout probability
-        :param encoder_output_size: Size of the encoder's output
         """
         # Initialize activations
         hidden_activation = get_activation_fn(hidden_act)
         output_activation = get_activation_fn(output_act)
         dropout = nn.Dropout(p=dropout_rate)
-
         layers = []
-        encoder_output_size = pred_len * channels
+        encoder_output_size = pred_len
         for size in layers_sizes:
             layers.extend([
                 nn.Linear(encoder_output_size, size),
@@ -133,7 +128,7 @@ class PatchTSTLightning(pl.LightningModule):
             encoder_output_size = size
 
         layers.extend([
-            nn.Linear(encoder_output_size, channels * window_size),
+            nn.Linear(encoder_output_size, pred_len),
             output_activation
         ])
 
@@ -143,37 +138,41 @@ class PatchTSTLightning(pl.LightningModule):
         """
         Forward pass of the model.
 
-        :param x: Input tensor of shape (batch_size, sequence_length, features)
-        # TODO change x sape
-        :return: Predicted anomaly scores of shape (batch_size, window_size)
+        :param x: Input tensor of shape (batch_size, channels, seq_len)
+        :return: Predicted anomaly scores of shape (batch_size, channels, pred_len)
 
         Example:
              x = torch.randn(32, 100, 10)  # batch_size=32, seq_len=100, features=10
              output = model(x)
              print(output.shape)  # torch.Size([32, window_size])
         """
-        x = x.transpose(2, 1)
-        x = self.encoder(x)
-        x = x.transpose(2, 1)
-        x = x.flatten(-2, -1)
-        x = self.classifier(x)
-        x = x.squeeze(-1)
-        batch_size = x.shape[0]
-        return x.view(batch_size, self.channels,
-                      self.window_size)  # Ridimensiona in (batch_size, channels, window_size)
+        # x: (batch_size, channels, seq_len)
+        x = x.transpose(1, 2)  # (batch_size, seq_len, channels)
+        x = self.encoder(x)  # (batch_size, pred_len, channels)
+        x = x.transpose(1, 2)  # (batch_size, channels, pred_len)
+        # TODO devo fare classificazione su channels, pred len o unisco le 2 dim? Discuti con ody
+        x = self.classifier(x)  # ( batch_size, channels, pred_len)
+        return x
 
-    # TODO make variables private
-    def check_compatibility(self, dataset: Dataset):  # TODO document
-        if len(dataset) == 0:  # TODO ?
+    def check_compatibility(self, dataset: Dataset):
+        """
+        Checks the compatibility with the model and the dataset given.
+        The dataset return type must contain:
+            - Signal: tensor of shape (batch_size, channels, context_window)
+            - Labels: tensor of shape (batch_size, channels, pred_len)
+        :param dataset:
+        :return:
+        """
+        if len(dataset) == 0:
             raise ValueError("Dataset is empty!")
         signal, output = dataset[0]
         signal_shape, output_shape = signal.shape, output.shape
         if len(signal_shape) != 2 or signal_shape[0] != self.channels or signal_shape[1] != self.context_window:
             raise ValueError(
-                f"Wrong input shape! Expected: (channels,context_window) = ({self.channels},{self.context_window}). Found: ({signal_shape})")
-        if len(output_shape) != 2 or output_shape[0] != self.channels or output_shape[1] != self.window_size:
+                f"Wrong input shape! Expected: (channels, context_window) = ({self.channels},{self.context_window}). Found: ({signal_shape})")
+        if len(output_shape) != 2 or output_shape[0] != self.channels or output_shape[1] != self.pred_len:
             raise ValueError(
-                f"Wrong output shape! Expected: (channels,context_window) = ({self.channels},{self.window_size}). Found: ({output_shape})")
+                f"Wrong output shape! Expected: (channels,window_size) = ({self.channels},{self.pred_len}). Found: ({output_shape})")
 
     def training_step(self, batch, batch_idx):
         x, y = batch

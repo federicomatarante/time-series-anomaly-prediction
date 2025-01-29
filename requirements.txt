@@ -1,4 +1,4 @@
-torch~=2.5.1+cu121
+torch==2.5.1+cu121
 pandas~=2.2.3
 numpy~=1.26.4
 tqdm~=4.67.1
@@ -6,3 +6,10 @@ scikit-learn~=1.4.2
 scipy~=1.15.1
 sympy~=1.13.1
 torchmetrics~=1.6.1
+
+torch-geometric
+--find-links https://data.pyg.org/whl/torch-2.5.1+cu121.html
+torch-scatter
+torch-sparse
+torch-cluster
+torch-spline-conv
