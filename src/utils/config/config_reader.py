@@ -76,6 +76,7 @@ class ConfigReader:
 
     def _convert_type(self, data: str, v_type: type, param_path: str, default=None, domain: set = None):
         allowed_types = (float, int, str, bool, Path)
+
         if v_type and v_type not in allowed_types:
             raise ValueError(f"v_type must be between the following categories: {allowed_types}")
         try:
@@ -84,6 +85,7 @@ class ConfigReader:
                 value = data.lower() == 'true'
             elif v_type is Path:
                 value = self.base_path / Path(data)
+                print(value)
             else:
                 value = v_type(data)
 
@@ -97,7 +99,7 @@ class ConfigReader:
             raise ValueError(f"Parameter {param_path} must be one of the following values: {domain}. Found: {value}")
         return value
 
-    def get_param(self, param_path: str, default: Any = None, v_type: type = None, nullable: bool = False,
+    def get_param(self, param_path: str, v_type: type = None, default: Any = None,  nullable: bool = False,
                   domain: set = None) -> Any:
         """
         Retrieve a configuration parameter using dot notation with optional type conversion.
@@ -140,7 +142,7 @@ class ConfigReader:
             raise ValueError(f"Parameter {param_path} must be in the format [section].[key]")
         try:
             section, param = param_path.rsplit('.', 1)
-            data = self.config_data[section][param]
+            data = str(self.config_data[section][param])
             if data.lower() in ('null', 'none'):
                 if nullable:
                     return None
@@ -201,7 +203,7 @@ class ConfigReader:
             raise ValueError(f"collection_type must be between the following categories: {allowed_collection_types}")
         try:
             section, param = param_path.rsplit('.', 1)
-            data = self.config_data[section][param]
+            data = str(self.config_data[section][param])
             if data.lower() in ('null', 'none'):
                 if nullable:
                     return None

@@ -68,16 +68,16 @@ class INIConfigReader(ConfigReader):
             config_data[section] = dict(parser[section])
         return config_data
 
-    def get_param(self, param_path: str, default: Any = None, v_type: type = None, nullable=False,domain=None) -> Any:
+    def get_param(self, param_path: str, v_type: type = None, default: Any = None, nullable=False, domain=None) -> Any:
         try:
-            return super().get_param(param_path, default, v_type, nullable,domain)
+            return super().get_param(param_path, v_type, default, nullable, domain)
         except (ValueError, TypeError) as e:
             raise type(e)(f'Error with configuration file "{self.config_path}": {str(e)}') from e
 
     def get_collection(self, param_path: str, default: Any = None, v_type: type = None, collection_type: type = tuple,
-                       nullable: bool = False, num_elems: int = None,domain=None):
+                       nullable: bool = False, num_elems: int = None, domain=None):
         try:
-            return super().get_collection(param_path, default, v_type, collection_type, nullable, num_elems,domain)
+            return super().get_collection(param_path, default, v_type, collection_type, nullable, num_elems, domain)
         except (ValueError, TypeError) as e:
             raise type(e)(f'Error with configuration file "{self.config_path}": {str(e)}') from e
 
