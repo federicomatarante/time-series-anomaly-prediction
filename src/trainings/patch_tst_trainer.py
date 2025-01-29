@@ -1,7 +1,9 @@
 import os
+import random
 from pathlib import Path
 from typing import Optional, Dict, Any
 
+import numpy as np
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
@@ -11,6 +13,20 @@ from torch.utils.data import DataLoader, Dataset
 from src.models.patch_tst_lightning import PatchTSTLightning
 from src.utils.config.config_reader import ConfigReader
 
+
+def set_seed(seed: int) -> None:
+    """
+    Set random seeds for reproducibility across Python, PyTorch, and CUDA.
+
+    :param seed: seed to use
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    # Optional: ensure CuDNN uses deterministic algorithms
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 def collate_batch(batch):
     """
@@ -26,7 +42,8 @@ def collate_batch(batch):
         torch.stack([x[1] for x in batch])
     )
 
-class PatchTSTTrainer:
+
+class PatchTSTTrainer:  # TODO seed for training replicability
     """
     PatchTST model trainer that handles training, evaluation, and testing procedures.
 
@@ -104,6 +121,7 @@ class PatchTSTTrainer:
          metrics = trainer.evaluate(test_dataset=test_dataset)
          print(f"Test loss: {metrics['test_loss']}")
     """
+
     def __init__(
             self,
             model_config: ConfigReader,
@@ -127,6 +145,11 @@ class PatchTSTTrainer:
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
         self.experiment_name = experiment_name
+
+        # Seed
+        seed = training_config.get_param('training.seed', v_type=int, nullable=True)
+        if seed is not None:
+            set_seed(seed)
 
         # Setup training parameters
         self.batch_size = training_config.get_param('training.batch_size', v_type=int)
@@ -187,7 +210,7 @@ class PatchTSTTrainer:
              train_loader, val_loader = trainer._setup_dataloaders()
              next(iter(train_loader))  # Get first batch
         """
-        
+
         train_loader = DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
@@ -196,7 +219,7 @@ class PatchTSTTrainer:
             pin_memory=True,
             persistent_workers=True,
             collate_fn=collate_batch,
-            
+
         )
 
         val_loader = DataLoader(
