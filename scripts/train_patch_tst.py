@@ -36,7 +36,7 @@ def main():
         'horizon_size': patch_tst_config.get_param('pred.len', v_type=int),
         'stride': dataset_config.get_param('windows.stride', v_type=int),
     }
-    print(dataset_args)
+
     split_ratio = dataset_config.get_param('dataset.train_split', v_type=float)
 
     dataset = ESADataset(**dataset_args)
