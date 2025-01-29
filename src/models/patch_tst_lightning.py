@@ -87,8 +87,7 @@ class PatchTSTLightning(pl.LightningModule):
         self.dropout = model_config_reader.get_param('dropout.classifier', v_type=float)
         self.channels = model_config_reader.get_param('data.enc_in', v_type=int)
         self.pred_len = model_config_reader.get_param('pred.len', v_type=int)
-        self._setup_classifier(self.layers_sizes, self.hidden_act, self.output_act, self.dropout,
-                               self.pred_len)
+        self._setup_classifier(self.layers_sizes, self.hidden_act, self.output_act, self.dropout)
         # Save hyperparameters
 
     def _setup_classifier(self,
@@ -96,7 +95,6 @@ class PatchTSTLightning(pl.LightningModule):
                           hidden_act: str,
                           output_act: str,
                           dropout_rate: int,
-                          pred_len: int,
                           ):
         """
         Sets up the classifier network for anomaly prediction.
@@ -111,7 +109,7 @@ class PatchTSTLightning(pl.LightningModule):
         output_activation = get_activation_fn(output_act)
         dropout = nn.Dropout(p=dropout_rate)
         layers = []
-        encoder_output_size = pred_len
+        encoder_output_size = self.pred_len * self.channels
         for size in layers_sizes:
             layers.extend([
                 nn.Linear(encoder_output_size, size),
@@ -121,7 +119,7 @@ class PatchTSTLightning(pl.LightningModule):
             encoder_output_size = size
 
         layers.extend([
-            nn.Linear(encoder_output_size, pred_len),
+            nn.Linear(encoder_output_size, self.pred_len * self.channels),
             output_activation
         ])
 
@@ -142,9 +140,10 @@ class PatchTSTLightning(pl.LightningModule):
         # x: (batch_size, channels, seq_len)
         x = x.transpose(1, 2)  # (batch_size, seq_len, channels)
         x = self.encoder(x)  # (batch_size, pred_len, channels)
-        x = x.transpose(1, 2)  # (batch_size, channels, pred_len)
-        # TODO devo fare classificazione su channels, pred len o unisco le 2 dim? Discuti con ody
-        x = self.classifier(x)  # ( batch_size, channels, pred_len)
+        x = x.transpose(1,2) # (batch_size, channels, pred_len)
+        x = x.flatten(-2, -1) # (batch_size, pred_len * channels)
+        x = self.classifier(x)  # (batch_size, pred_len * channels)
+        x = x.view(-1, self.channels, self.pred_len,)  # (batch_size, channels, pred_len)
         return x
 
     def check_compatibility(self, dataset: Dataset):
@@ -171,6 +170,7 @@ class PatchTSTLightning(pl.LightningModule):
         x, y = batch
         y_hat = self(x)
         loss = self.loss_fn(y_hat, y)
+        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -246,7 +246,7 @@ class PatchTSTLightning(pl.LightningModule):
         checkpoint['model_config'] = {
             # Architecture parameters
             'layers_sizes': self.layers_sizes,
-            'window_size': self.window_size,
+            'context_window': self.context_window,
             'hidden_act': self.hidden_act,
             'output_act': self.output_act,
             'dropout': self.dropout,
