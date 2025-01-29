@@ -43,7 +43,7 @@ def collate_batch(batch):
     )
 
 
-class PatchTSTTrainer:  # TODO seed for training replicability
+class PatchTSTTrainer:
     """
     PatchTST model trainer that handles training, evaluation, and testing procedures.
 
