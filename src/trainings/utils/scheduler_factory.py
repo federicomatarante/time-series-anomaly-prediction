@@ -64,10 +64,10 @@ class StepLRBuilder(SchedulerBuilder):
     def build(self, optimizer: Optimizer) -> LRScheduler:
         return torch.optim.lr_scheduler.StepLR(
             optimizer=optimizer,
-            step_size=self.config.get_param('scheduler.StepLRBuilder.step_size', v_type=int),
-            gamma=self.config.get_param('scheduler.StepLRBuilder.gamma', v_type=float),
-            verbose=self.config.get_param('scheduler.StepLRBuilder.verbose', v_type=bool),
-            last_epoch=self.config.get_param('scheduler.StepLRBuilder.last_epoch', v_type=int)
+            step_size=self.config.get_param('scheduler.StepLR.step_size', v_type=int),
+            gamma=self.config.get_param('scheduler.StepLR.gamma', v_type=float),
+            verbose=self.config.get_param('scheduler.StepLR.verbose', v_type=bool),
+            last_epoch=self.config.get_param('scheduler.StepLR.last_epoch', v_type=int)
         )
 
 
