@@ -14,6 +14,7 @@ torch.set_float32_matmul_precision("medium")
 def get_args():
     parser = argparse.ArgumentParser(description='Program that accepts a string argument')
     parser.add_argument('--checkpoint', type=str, help='Input string to process', default=None)
+    parser.add_argument('--experiment', type=str, help='Experiment name', default="patchtst_training")
     args = parser.parse_args()
     return args
 
@@ -45,6 +46,7 @@ def main():
     test_split = dataset_config.get_param('dataset.test_split', v_type=float)
 
     dataset = ESADataset(**dataset_args)
+    # dataset = Subset(dataset, range(2000))
     dataset_size = len(dataset)
     valid_size = int(valid_split * dataset_size)
     test_size = int(test_split * dataset_size)
@@ -63,7 +65,7 @@ def main():
         training_config=training_config,
         train_dataset=train_dataset,
         val_dataset=valid_dataset,
-        experiment_name='patchtst_training',
+        experiment_name=args.experiment,
         checkpoint_file=checkpoint,
     )
     trainer.train()

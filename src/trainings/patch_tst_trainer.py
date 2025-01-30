@@ -9,6 +9,7 @@ import torch
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.data import DataLoader, Dataset
+from pytorch_lightning import Trainer
 
 from src.models.patch_tst_lightning import PatchTSTLightning
 from src.utils.config.config_reader import ConfigReader
@@ -270,7 +271,7 @@ class PatchTSTTrainer:
 
         return callbacks
 
-    def _setup_trainer(self, callbacks: list) -> pl.Trainer:
+    def _setup_trainer(self, callbacks: list):
         """
         Set up the PyTorch Lightning trainer with specified configuration.
 
@@ -294,7 +295,7 @@ class PatchTSTTrainer:
         devices = self.hardware_num_devices
 
         # Initialize trainer
-        self.trainer = pl.Trainer(
+        self.trainer = Trainer(
             max_epochs=self.max_epochs,
             callbacks=callbacks,
             logger=logger,
@@ -342,10 +343,10 @@ class PatchTSTTrainer:
 
         # Return the best model path and training results
         results = {
-            'best_model_path': trainer.checkpoint_callback.best_model_path,
-            'best_model_score': trainer.checkpoint_callback.best_model_score,
-            'trained_epochs': trainer.current_epoch,
-            'training_log_dir': trainer.logger.log_dir
+            'best_model_path': self.trainer.checkpoint_callback.best_model_path,
+            'best_model_score': self.trainer.checkpoint_callback.best_model_score,
+            'trained_epochs': self.trainer.current_epoch,
+            'training_log_dir': self.trainer.logger.log_dir
         }
 
         return results
