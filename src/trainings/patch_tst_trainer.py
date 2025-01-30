@@ -25,7 +25,7 @@ def set_seed(seed: int) -> None:
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     # Optional: ensure CuDNN uses deterministic algorithms
-    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.deterministic = False
     torch.backends.cudnn.benchmark = False
 
 def collate_batch(batch):
@@ -294,7 +294,7 @@ class PatchTSTTrainer:
         devices = self.hardware_num_devices
 
         # Initialize trainer
-        trainer = pl.Trainer(
+        self.trainer = pl.Trainer(
             max_epochs=self.max_epochs,
             callbacks=callbacks,
             logger=logger,
@@ -304,7 +304,6 @@ class PatchTSTTrainer:
             gradient_clip_val=self.gradient_clip_value,
         )
 
-        return trainer
 
     def train(self) -> Dict[str, Any]:
         """
@@ -331,10 +330,10 @@ class PatchTSTTrainer:
         callbacks = self._setup_callbacks()
 
         # Setup trainer
-        trainer = self._setup_trainer(callbacks)
+        self._setup_trainer(callbacks)
 
         # Train the model
-        trainer.fit(
+        self.trainer.fit(
             model=self.model,
             train_dataloaders=train_loader,
             val_dataloaders=val_loader,
@@ -392,16 +391,16 @@ class PatchTSTTrainer:
             )
 
         # Setup trainer for testing
-        trainer = pl.Trainer(
-            accelerator=self.hardware_accelerator,
-            devices=self.hardware_num_devices,
-            deterministic=True,
-            enable_checkpointing=True,
-            logger=True
-        )
+        # trainer = pl.Trainer(
+        #     accelerator=self.hardware_accelerator,
+        #     devices=self.hardware_num_devices,
+        #     deterministic=False,
+        #     enable_checkpointing=True,
+        #     logger=True
+        # )
 
         # Run test
-        test_results = trainer.test(self.model, dataloaders=test_dataloader)[0]
+        test_results = self.trainer.test(self.model, dataloaders=test_dataloader)[0]
 
         # Format metrics
         metrics = {
