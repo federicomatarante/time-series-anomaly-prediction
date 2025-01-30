@@ -1,12 +1,15 @@
 import os
 from pathlib import Path
 
-from torch.utils.data import Subset
+from torch.utils.data import Subset, DataLoader
 
 from src.dataset.esa import ESADataset
 from src.trainings.patch_tst_trainer import PatchTSTTrainer
 from src.utils.config.ini_config_reader import INIConfigReader
 import argparse
+
+import torch
+torch.set_float32_matmul_precision("medium")
 
 def get_args():
     parser = argparse.ArgumentParser(description='Program that accepts a string argument')
@@ -37,16 +40,19 @@ def main():
         'stride': dataset_config.get_param('windows.stride', v_type=int),
     }
 
-    split_ratio = dataset_config.get_param('dataset.train_split', v_type=float)
+    # split_ratio = dataset_config.get_param('dataset.train_split', v_type=float)
+    valid_split = dataset_config.get_param('dataset.valid_split', v_type=float)
+    test_split = dataset_config.get_param('dataset.test_split', v_type=float)
 
     dataset = ESADataset(**dataset_args)
     dataset_size = len(dataset)
-    train_size = int(split_ratio * dataset_size)
+    valid_size = int(valid_split * dataset_size)
+    test_size = int(test_split * dataset_size)
+    train_size = dataset_size - (valid_size+test_size)
 
-    train_dataset = Subset(dataset, range(train_size))
-    valid_dataset = Subset(dataset, range(train_size, len(dataset)))
-    # train_dataset = Subset(dataset, range(512))
-    # valid_dataset = Subset(dataset, range(512, 1024))
+
+    train_dataset, valid_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, valid_size, test_size])
+
 
     checkpoint = None
     if args.checkpoint is not None:
@@ -61,6 +67,8 @@ def main():
         checkpoint_file=checkpoint,
     )
     trainer.train()
+    torch.use_deterministic_algorithms(False) # I get an error if True (default)
+    trainer.evaluate(test_dataset=test_dataset)
 
 
 if __name__ == '__main__':

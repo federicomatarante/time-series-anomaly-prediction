@@ -254,7 +254,7 @@ class PatchTSTLightning(pl.LightningModule):
             'pred_len': self.pred_len,
 
             # Other model-specific parameters
-            'threshold': self.train_existence.threshold,
+            # 'threshold': self.train_existence.threshold,
             'val_threshold': self.val_existence.threshold,
             'test_threshold': self.test_existence.threshold
         }
@@ -305,8 +305,8 @@ class PatchTSTLightning(pl.LightningModule):
                         setattr(self.encoder, key, value)
 
                 # Update metrics thresholds
-                if 'threshold' in model_config:
-                    self.train_existence.threshold = model_config['threshold']
+                # if 'threshold' in model_config:
+                #     self.train_existence.threshold = model_config['threshold']
                 if 'val_threshold' in model_config:
                     self.val_existence.threshold = model_config['val_threshold']
                 if 'test_threshold' in model_config:
