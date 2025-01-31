@@ -1,16 +1,20 @@
 import os
 from pathlib import Path
 
-from torch.utils.data import Subset
+from torch.utils.data import Subset, DataLoader
 
 from src.dataset.esa import ESADataset
 from src.trainings.patch_tst_trainer import PatchTSTTrainer
 from src.utils.config.ini_config_reader import INIConfigReader
 import argparse
 
+import torch
+torch.set_float32_matmul_precision("medium")
+
 def get_args():
     parser = argparse.ArgumentParser(description='Program that accepts a string argument')
     parser.add_argument('--checkpoint', type=str, help='Input string to process', default=None)
+    parser.add_argument('--experiment', type=str, help='Experiment name', default="patchtst_training")
     args = parser.parse_args()
     return args
 
@@ -37,16 +41,20 @@ def main():
         'stride': dataset_config.get_param('windows.stride', v_type=int),
     }
 
-    split_ratio = dataset_config.get_param('dataset.train_split', v_type=float)
+    # split_ratio = dataset_config.get_param('dataset.train_split', v_type=float)
+    valid_split = dataset_config.get_param('dataset.valid_split', v_type=float)
+    test_split = dataset_config.get_param('dataset.test_split', v_type=float)
 
     dataset = ESADataset(**dataset_args)
+    # dataset = Subset(dataset, range(2000))
     dataset_size = len(dataset)
-    train_size = int(split_ratio * dataset_size)
+    valid_size = int(valid_split * dataset_size)
+    test_size = int(test_split * dataset_size)
+    train_size = dataset_size - (valid_size+test_size)
 
-    train_dataset = Subset(dataset, range(train_size))
-    valid_dataset = Subset(dataset, range(train_size, len(dataset)))
-    # train_dataset = Subset(dataset, range(512))
-    # valid_dataset = Subset(dataset, range(512, 1024))
+
+    train_dataset, valid_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, valid_size, test_size])
+
 
     checkpoint = None
     if args.checkpoint is not None:
@@ -57,10 +65,12 @@ def main():
         training_config=training_config,
         train_dataset=train_dataset,
         val_dataset=valid_dataset,
-        experiment_name='patchtst_training',
+        experiment_name=args.experiment,
         checkpoint_file=checkpoint,
     )
     trainer.train()
+    torch.use_deterministic_algorithms(False) # I get an error if True (default)
+    trainer.evaluate(test_dataset=test_dataset)
 
 
 if __name__ == '__main__':

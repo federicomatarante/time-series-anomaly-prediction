@@ -30,6 +30,7 @@ class PatchTSTLightning(pl.LightningModule):
                  model_config_reader: ConfigReader,
                  training_config_reader: ConfigReader):
         super().__init__()
+        self.save_hyperparameters()
         self.encoder = PatchTST(model_config_reader)
         self.loss_fn = WassersteinLoss(
             apply_scaling_factor=training_config_reader.get_param('training.loss_scaling_factor', v_type=bool))
@@ -254,7 +255,7 @@ class PatchTSTLightning(pl.LightningModule):
             'pred_len': self.pred_len,
 
             # Other model-specific parameters
-            'threshold': self.train_existence.threshold,
+            # 'threshold': self.train_existence.threshold,
             'val_threshold': self.val_existence.threshold,
             'test_threshold': self.test_existence.threshold
         }

@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
-from torch import tensor
+from torch import Tensor
 
 
-def wasserstein_distance(y_pred: tensor, y_true: tensor, apply_scaling_factor=False) -> tensor:
+def wasserstein_distance(y_pred: Tensor, y_true: Tensor, apply_scaling_factor=False) -> Tensor:
     """
     Compute the Wasserstein distance between predicted and true time series.
     :param y_pred: Predicted time series tensor. Shape: (batch_size, channels, window_size)
@@ -20,27 +20,18 @@ def wasserstein_distance(y_pred: tensor, y_true: tensor, apply_scaling_factor=Fa
 
     T = y_pred.size(2)  # sequence length
     C = y_pred.size(1)
-    # Initialize sum for accumulating distances
-    total_distance = 0.0
-    # Iterate over i from 1 to T
-    for i in range(1, T + 1):
-        # Calculate cumulative sums up to index i for both sequences for each channel
-        pred_cumsum = torch.cumsum(y_pred[:, :, :i], dim=2)
-        true_cumsum = torch.cumsum(y_true[:, :, :i], dim=2)
+    abs_diff = torch.abs(y_pred - y_true)  # Shape: [B, C, T]
+    T = abs_diff.shape[2]
+    mask = torch.triu(torch.ones(T, T)).to(abs_diff.device)  # Shape: [T, T]
+    abs_diff = abs_diff.transpose(1, 2)  # Shape: [B, T, C]
+    masked_sums = abs_diff.unsqueeze(2) * mask.unsqueeze(0).unsqueeze(-1)
 
-        # Calculate absolute difference between cumulative sums for each channel
-        diff = torch.abs(pred_cumsum - true_cumsum)
-
-        # Sum over the dimension of the channels and the window (from 1 to i)
-        distance_i = torch.sum(diff, dim=(1, 2))
-
-        # Add to total distance
-        total_distance += distance_i.mean()
-
-    # Apply final scaling factor
-    scaling = (2 / (T * C * (T * C + 1))) if apply_scaling_factor else 1
-    wasserstein = scaling * total_distance
-    return wasserstein
+    channel_sums = masked_sums.sum(dim=2)  # Shape: [B, T, C]    
+    channel_sums = channel_sums.sum(dim=1)  # Shape: [B, C]
+    scaling = (2 / (T * C * (T + 1))) if apply_scaling_factor else 1
+    wass_2 = scaling * channel_sums.sum(dim=1).mean()  # Scalar
+    
+    return wass_2
 
 
 class WassersteinLoss(nn.Module):
@@ -59,7 +50,7 @@ class WassersteinLoss(nn.Module):
         super(WassersteinLoss, self).__init__()
         self.apply_scaling_factor = apply_scaling_factor
 
-    def forward(self, y_pred: tensor, y_true: tensor) -> tensor:
+    def forward(self, y_pred: Tensor, y_true: Tensor) -> Tensor:
         """
         Compute Wasserstein loss between predicted and true multivariate time series.
         :param y_pred: Predicted time series tensor of shape (batch_size, channels, sequence_length)

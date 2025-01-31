@@ -15,6 +15,18 @@
             },
             "program": "scripts/train_patch_tst.py",
             "console": "integratedTerminal",
+        },
+
+        {
+            "name": "Mock training",
+            "type": "debugpy",
+            "request": "launch",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
+            },
+            "program": "scripts/train_patch_tst.py",
+            "args": ["--experiment", "tmp-mock-train"],
+            "console": "integratedTerminal",
         }
     ]
 }
