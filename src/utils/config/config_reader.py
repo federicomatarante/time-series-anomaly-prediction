@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Tuple, Set
 
 
 class ConfigReader:
@@ -99,7 +99,7 @@ class ConfigReader:
             raise ValueError(f"Parameter {param_path} must be one of the following values: {domain}. Found: {value}")
         return value
 
-    def get_param(self, param_path: str, v_type: type = None, default: Any = None,  nullable: bool = False,
+    def get_param(self, param_path: str, v_type: type = None, default: Any = None, nullable: bool = False,
                   domain: set = None) -> Any:
         """
         Retrieve a configuration parameter using dot notation with optional type conversion.
@@ -253,6 +253,41 @@ class ConfigReader:
             invalid = config.get_section('invalid')  # Returns: None
         """
         return self.config_data.get(section)
+
+    def sub_reader(self, sections: Set[str] | Tuple[str] | List[str]):
+        """
+        Create a new ConfigReader instance with a subset of the original configuration sections.
+
+        :param sections: Collection of section names to include in the new ConfigReader instance.
+                        Can be provided as a Set, Tuple, or List of strings.
+        :return: A new ConfigReader instance containing only the specified sections
+
+        Example:
+            config_data = {
+                'database': {
+                    'host': 'localhost',
+                    'port': '5432'
+                },
+                'api': {
+                    'timeout': '30'
+                },
+                'logging': {
+                    'level': 'INFO'
+                }
+            }
+            config = ConfigReader(config_data)
+
+            # Create a sub-reader with specific sections
+            db_api_config = config.sub_reader({'database', 'api'})
+            # Returns a ConfigReader with only 'database' and 'api' sections
+
+            # Access parameters in the sub-reader
+            host = db_api_config.get_param('database.host')  # Returns: 'localhost'
+        """
+        new_config = {
+            section: self.config_data.get(section) for section in sections
+        }
+        return ConfigReader(new_config)
 
     def __getitem__(self, key: str) -> Dict[str, str]:
         """
