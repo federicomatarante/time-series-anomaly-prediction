@@ -30,20 +30,20 @@ class Encoder(nn.Module):
             q_k_mask = get_q_k(opt.input_size + padding, opt.inner_size, opt.window_size[0], opt.device)
             k_q_mask = get_k_q(q_k_mask)
             self.layers = nn.ModuleList([
-                EncoderLayer(opt.d_model, opt.d_inner_hid, opt.n_head, opt.d_k, opt.d_v, dropout=opt.dropout, \
-                    normalize_before=False, use_tvm=True, q_k_mask=q_k_mask, k_q_mask=k_q_mask) for i in range(opt.n_layer)
+                EncoderLayer(opt.d_model, opt.d_inner_hid, opt.n_head, opt.d_k, opt.d_v, dropout=opt.proj_dropout, \
+                             normalize_before=False, use_tvm=True, q_k_mask=q_k_mask, k_q_mask=k_q_mask) for i in range(opt.n_layer)
                 ])
         else:
             self.layers = nn.ModuleList([
-                EncoderLayer(opt.d_model, opt.d_inner_hid, opt.n_head, opt.d_k, opt.d_v, dropout=opt.dropout, \
-                    normalize_before=False) for i in range(opt.n_layer)
+                EncoderLayer(opt.d_model, opt.d_inner_hid, opt.n_head, opt.d_k, opt.d_v, dropout=opt.proj_dropout, \
+                             normalize_before=False) for i in range(opt.n_layer)
                 ])
 
         if opt.embed_type == 'CustomEmbedding':
-            self.enc_embedding = DataEmbedding(opt.enc_in, opt.d_model, opt.dropout)
+            self.enc_embedding = DataEmbedding(opt.enc_in, opt.d_model, opt.proj_dropout)
             # self.enc_embedding = CustomEmbedding(opt.enc_in, opt.d_model, opt.covariate_size, opt.seq_num, opt.dropout)
         else:
-            self.enc_embedding = DataEmbedding(opt.enc_in, opt.d_model, opt.dropout)
+            self.enc_embedding = DataEmbedding(opt.enc_in, opt.d_model, opt.proj_dropout)
 
         self.conv_layers = eval(opt.CSCM)(opt.d_model, opt.window_size, opt.d_bottleneck)
 

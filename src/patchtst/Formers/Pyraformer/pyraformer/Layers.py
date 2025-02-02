@@ -385,16 +385,16 @@ class Decoder(nn.Module):
         self.mask = mask
 
         self.layers = nn.ModuleList([
-            DecoderLayer(opt.d_model, opt.d_inner_hid, opt.n_head, opt.d_k, opt.d_v, dropout=opt.dropout, \
-                normalize_before=False),
-            DecoderLayer(opt.d_model, opt.d_inner_hid, opt.n_head, opt.d_k, opt.d_v, dropout=opt.dropout, \
-                normalize_before=False)
+            DecoderLayer(opt.d_model, opt.d_inner_hid, opt.n_head, opt.d_k, opt.d_v, dropout=opt.proj_dropout, \
+                         normalize_before=False),
+            DecoderLayer(opt.d_model, opt.d_inner_hid, opt.n_head, opt.d_k, opt.d_v, dropout=opt.proj_dropout, \
+                         normalize_before=False)
             ])
 
         if opt.embed_type == 'CustomEmbedding':
-            self.dec_embedding = CustomEmbedding(opt.enc_in, opt.d_model, opt.covariate_size, opt.seq_num, opt.dropout)
+            self.dec_embedding = CustomEmbedding(opt.enc_in, opt.d_model, opt.covariate_size, opt.seq_num, opt.proj_dropout)
         else:
-            self.dec_embedding = DataEmbedding(opt.enc_in, opt.d_model, opt.dropout)
+            self.dec_embedding = DataEmbedding(opt.enc_in, opt.d_model, opt.proj_dropout)
 
     def forward(self, x_dec, x_mark_dec, refer):
         dec_enc = self.dec_embedding(x_dec, x_mark_dec)

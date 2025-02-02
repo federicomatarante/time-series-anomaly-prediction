@@ -199,8 +199,8 @@ class GraphSelfAttention(nn.Module):
         nn.init.xavier_uniform_(self.fc.weight)
 
         self.layer_norm = nn.LayerNorm(opt.d_model, eps=1e-6)
-        self.dropout_attn = nn.Dropout(opt.dropout)
-        self.dropout_fc = nn.Dropout(opt.dropout)
+        self.dropout_attn = nn.Dropout(opt.proj_dropout)
+        self.dropout_fc = nn.Dropout(opt.proj_dropout)
         self.seq_len = opt.seq_len
         self.window_size = opt.window_size
         self.stride_size = opt.stride_size
@@ -264,8 +264,8 @@ class NormalSelfAttention(nn.Module):
         nn.init.xavier_uniform_(self.fc.weight)
 
         self.layer_norm = nn.LayerNorm(opt.d_model, eps=1e-6)
-        self.dropout_attn = nn.Dropout(opt.dropout)
-        self.dropout_fc = nn.Dropout(opt.dropout)
+        self.dropout_attn = nn.Dropout(opt.proj_dropout)
+        self.dropout_fc = nn.Dropout(opt.proj_dropout)
         self.seq_len = opt.seq_len
         self.window_size = opt.window_size
         self.stride_size = opt.stride_size
@@ -334,8 +334,8 @@ class ProbSparseAttention(nn.Module):
         nn.init.xavier_uniform_(self.fc.weight)
 
         self.layer_norm = nn.LayerNorm(opt.d_model, eps=1e-6)
-        self.dropout_attn = nn.Dropout(opt.dropout)
-        self.dropout_fc = nn.Dropout(opt.dropout)
+        self.dropout_attn = nn.Dropout(opt.proj_dropout)
+        self.dropout_fc = nn.Dropout(opt.proj_dropout)
         self.seq_len = opt.seq_len
         self.factor = opt.factor
 

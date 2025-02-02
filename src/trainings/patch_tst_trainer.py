@@ -1,16 +1,19 @@
 import os
 import random
+from abc import abstractmethod, ABC
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 
 import numpy as np
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
+from torch import nn
 from torch.utils.data import DataLoader, Dataset
 from pytorch_lightning import Trainer
 
+from src.models.c_patch_tst_lightning import CPatchTSTLightning
 from src.models.patch_tst_lightning import PatchTSTLightning
 from src.utils.config.config_reader import ConfigReader
 
@@ -29,6 +32,7 @@ def set_seed(seed: int) -> None:
     torch.backends.cudnn.deterministic = False
     torch.backends.cudnn.benchmark = False
 
+
 def collate_batch(batch):
     """
     Collate function for DataLoader that stacks inputs and targets.
@@ -44,7 +48,7 @@ def collate_batch(batch):
     )
 
 
-class PatchTSTTrainer:
+class PatchTSTTrainer(ABC):
     """
     PatchTST model trainer that handles training, evaluation, and testing procedures.
 
@@ -183,23 +187,16 @@ class PatchTSTTrainer:
         os.makedirs(self.checkpoint_dir, exist_ok=True)
         os.makedirs(self.log_dir, exist_ok=True)
 
-        # Setup model and checkpoint file
-        if checkpoint_file:
-            self.checkpoint_path = Path(self.checkpoint_dir) / Path(checkpoint_file)
-            if not self.checkpoint_path.exists():
-                raise ValueError(f"Checkpoint file not found: {self.checkpoint_path}")
-            self.model = PatchTSTLightning.load_from_checkpoint(
-                self.checkpoint_path,
-                model_config_reader=model_config,
-                training_config_reader=training_config
-            )
-        else:
-            # Initialize model
-            self.checkpoint_path = None
-            self.model = PatchTSTLightning(
-                model_config_reader=model_config,
-                training_config_reader=training_config,
-            )
+        self.checkpoint_path, self.model = self.setup_model(checkpoint_file)
+
+    @abstractmethod
+    def setup_model(self, checkpoint_file: Optional[str]) -> Tuple[Path, nn.Module]:
+        """
+        Model to inherit to specify the class-behavior. Must return the checkpoint path and the model to use for trianing.
+        :param checkpoint_file: the name of the checkpoint file to use. Can be null.
+        :return: the checkpoint path and the model to use
+        """
+        pass
 
     def _setup_dataloaders(self) -> tuple[DataLoader, DataLoader]:
         """
@@ -255,7 +252,8 @@ class PatchTSTTrainer:
             monitor=self.checkpoint_monitor,
             mode=self.checkpoint_mode,
             save_top_k=self.checkpoint_save_top_k,
-            save_last=self.checkpoint_save_last
+            save_last=self.checkpoint_save_last,
+
         )
         callbacks.append(checkpoint_callback)
 
@@ -304,7 +302,6 @@ class PatchTSTTrainer:
             deterministic=False,
             gradient_clip_val=self.gradient_clip_value,
         )
-
 
     def train(self) -> Dict[str, Any]:
         """

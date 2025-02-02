@@ -23,13 +23,13 @@ class Encoder(nn.Module):
             q_k_mask = get_q_k(opt.input_size, opt.inner_size, opt.window_size[0], opt.device)
             k_q_mask = get_k_q(q_k_mask)
             self.layers = nn.ModuleList([
-                EncoderLayer(opt.d_model, opt.d_inner_hid, opt.n_head, opt.d_k, opt.d_v, dropout=opt.dropout, \
-                    normalize_before=False, use_tvm=True, q_k_mask=q_k_mask, k_q_mask=k_q_mask) for i in range(opt.n_layer)
+                EncoderLayer(opt.d_model, opt.d_inner_hid, opt.n_head, opt.d_k, opt.d_v, dropout=opt.proj_dropout, \
+                             normalize_before=False, use_tvm=True, q_k_mask=q_k_mask, k_q_mask=k_q_mask) for i in range(opt.n_layer)
                 ])
         else:
             self.layers = nn.ModuleList([
-                EncoderLayer(opt.d_model, opt.d_inner_hid, opt.n_head, opt.d_k, opt.d_v, dropout=opt.dropout, \
-                    normalize_before=False) for i in range(opt.n_layer)
+                EncoderLayer(opt.d_model, opt.d_inner_hid, opt.n_head, opt.d_k, opt.d_v, dropout=opt.proj_dropout, \
+                             normalize_before=False) for i in range(opt.n_layer)
                 ])
 
         self.embedding = SingleStepEmbedding(opt.covariate_size, opt.num_seq, opt.d_model, opt.input_size, opt.device)

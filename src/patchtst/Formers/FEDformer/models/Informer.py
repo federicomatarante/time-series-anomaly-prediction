@@ -19,21 +19,21 @@ class Model(nn.Module):
 
         # Embedding
         self.enc_embedding = DataEmbedding(configs.enc_in, configs.d_model, configs.embed, configs.freq,
-                                           configs.dropout)
+                                           configs.proj_dropout)
         self.dec_embedding = DataEmbedding(configs.dec_in, configs.d_model, configs.embed, configs.freq,
-                                           configs.dropout)
+                                           configs.proj_dropout)
 
         # Encoder
         self.encoder = Encoder(
             [
                 EncoderLayer(
                     AttentionLayer(
-                        ProbAttention(False, configs.factor, attention_dropout=configs.dropout,
+                        ProbAttention(False, configs.factor, attention_dropout=configs.proj_dropout,
                                       output_attention=configs.output_attention),
                         configs.d_model, configs.n_heads),
                     configs.d_model,
                     configs.d_ff,
-                    dropout=configs.dropout,
+                    dropout=configs.proj_dropout,
                     activation=configs.activation
                 ) for l in range(configs.e_layers)
             ],
@@ -49,14 +49,14 @@ class Model(nn.Module):
             [
                 DecoderLayer(
                     AttentionLayer(
-                        ProbAttention(True, configs.factor, attention_dropout=configs.dropout, output_attention=False),
+                        ProbAttention(True, configs.factor, attention_dropout=configs.proj_dropout, output_attention=False),
                         configs.d_model, configs.n_heads),
                     AttentionLayer(
-                        ProbAttention(False, configs.factor, attention_dropout=configs.dropout, output_attention=False),
+                        ProbAttention(False, configs.factor, attention_dropout=configs.proj_dropout, output_attention=False),
                         configs.d_model, configs.n_heads),
                     configs.d_model,
                     configs.d_ff,
-                    dropout=configs.dropout,
+                    dropout=configs.proj_dropout,
                     activation=configs.activation,
                 )
                 for l in range(configs.d_layers)

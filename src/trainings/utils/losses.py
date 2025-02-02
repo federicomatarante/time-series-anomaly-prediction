@@ -19,7 +19,7 @@ def wasserstein_distance(y_pred: Tensor, y_true: Tensor, apply_scaling_factor=Fa
         raise ValueError(f"Shape mismatch: y_pred shape {y_pred.shape} != y_true shape {y_true.shape}")
 
     T = y_pred.size(2)  # sequence length
-    C = y_pred.size(1)
+    C = y_pred.size(1) # Number of channels
     abs_diff = torch.abs(y_pred - y_true)  # Shape: [B, C, T]
     T = abs_diff.shape[2]
     mask = torch.triu(torch.ones(T, T)).to(abs_diff.device)  # Shape: [T, T]
