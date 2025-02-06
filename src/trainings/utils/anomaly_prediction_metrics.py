@@ -39,8 +39,8 @@ class ExistenceOfAnomaly(Metric):
         preds = preds.flatten()
         targets = targets.flatten()
         # Check existence of anomalies in each sequence
-        pred_exists = (preds >= self.threshold)
-        target_exists = (targets >= self.threshold)
+        pred_exists = (torch.sum(preds, dim=-1) >= self.threshold)
+        target_exists = (torch.sum(targets, dim=-1) >= self.threshold)
 
         self.true_positives += torch.sum(pred_exists & target_exists)
         self.false_positives += torch.sum(pred_exists & ~target_exists)
@@ -94,9 +94,9 @@ class DensityOfAnomalies(Metric):
                 f"Got predictions shape {preds.shape} and targets shape {targets.shape}")
 
         # Compute density difference for each sequence in batch
-        _, C, T = preds.shape
-        self.cumulative_density += torch.sum(torch.abs(torch.sum(targets - preds, dim=(1, 2))))
-        self.total += C * T
+
+        self.cumulative_density += torch.abs(torch.sum(targets - preds))
+        self.total += preds.numel()
 
     def compute(self) -> float:
         """
@@ -141,17 +141,20 @@ class LeadTime(Metric):
                 f"Inputs must be 3D tensors of shape [batch_size, channels, window_size]. "
                 f"Got predictions shape {preds.shape} and targets shape {targets.shape}")
 
-        batch_size, window_size , timesteps= preds.shape
-        self.total_length += window_size
+        batch_size, channels, windows_size = preds.shape
+        self.total_length += preds.numel()
 
-        for i in range(batch_size):
-            pred_indices = torch.nonzero(preds[i] >= self.threshold)
-            target_indices = torch.nonzero(targets[i] >= self.threshold)
-            if len(pred_indices) > 0 and len(target_indices) > 0:
-                # Get first occurrence of anomaly in both sequences
-                first_pred = pred_indices[0]
-                first_target = target_indices[0]
-                self.cumulative_distance += torch.sum(torch.abs(first_pred - first_target)).item()
+        for b in range(batch_size):
+            for c in range(channels):
+                curr_preds = preds[b][c]
+                curr_targets = targets[b][c]
+                pred_indices = torch.nonzero(curr_preds >= self.threshold)
+                target_indices = torch.nonzero(curr_targets >= self.threshold)
+                if len(pred_indices) > 0 and len(target_indices) > 0:
+                    # Get first occurrence of anomaly in both sequences
+                    first_pred = pred_indices[0]
+                    first_target = target_indices[0]
+                    self.cumulative_distance += torch.abs(torch.sum(first_pred - first_target)).item()
 
     def compute(self) -> float:
         """
@@ -201,7 +204,6 @@ class DiceScore(Metric):
                 f"Got predictions shape {preds.shape} and targets shape {targets.shape}")
         pred_mask = preds >= self.threshold
         target_mask = targets >= self.threshold
-
         self.pred_positives += torch.sum(pred_mask)
         self.target_positives += torch.sum(target_mask)
         self.common_predicted_positives += torch.sum(pred_mask & target_mask)
