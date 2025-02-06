@@ -186,8 +186,14 @@ class PatchTSTTrainer(ABC):
         self.log_dir = training_config.get_param('logging.save_directory', v_type=Path)
         os.makedirs(self.checkpoint_dir, exist_ok=True)
         os.makedirs(self.log_dir, exist_ok=True)
-
+        # Setup model
         self.checkpoint_path, self.model = self.setup_model(checkpoint_file)
+
+        # Setup callbacks
+        callbacks = self._setup_callbacks()
+
+        # Setup trainer
+        self._setup_trainer(callbacks)
 
     @abstractmethod
     def setup_model(self, checkpoint_file: Optional[str]) -> Tuple[Path, nn.Module]:
@@ -324,12 +330,6 @@ class PatchTSTTrainer(ABC):
         # Setup dataloaders
         train_loader, val_loader = self._setup_dataloaders()
 
-        # Setup callbacks
-        callbacks = self._setup_callbacks()
-
-        # Setup trainer
-        self._setup_trainer(callbacks)
-
         # Train the model
         self.trainer.fit(
             model=self.model,
@@ -387,15 +387,6 @@ class PatchTSTTrainer(ABC):
                 shuffle=False,
                 pin_memory=True
             )
-
-        # Setup trainer for testing
-        # trainer = pl.Trainer(
-        #     accelerator=self.hardware_accelerator,
-        #     devices=self.hardware_num_devices,
-        #     deterministic=False,
-        #     enable_checkpointing=True,
-        #     logger=True
-        # )
 
         # Run test
         test_results = self.trainer.test(self.model, dataloaders=test_dataloader)[0]

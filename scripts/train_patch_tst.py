@@ -7,5 +7,6 @@ if __name__ == '__main__':
         model_config_name='patchtst.ini',
         train_config_name='training.ini',
         logs_path='logs/patch_tst_training',
-        trainer_class=BasePatchTSTTrainer
+        trainer_class=BasePatchTSTTrainer,
+        checkpoint_file_name='last'
     )

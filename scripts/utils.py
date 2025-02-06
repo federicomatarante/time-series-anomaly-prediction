@@ -21,7 +21,7 @@ def get_args():
 
 
 def train_model(dataset_config_name: str, model_config_name: str, train_config_name: str, logs_path: str,
-                trainer_class: Type[PatchTSTTrainer]):
+                trainer_class: Type[PatchTSTTrainer], checkpoint_file_name: str = None):
     """
     Trains a model using the specified configuration files and trainer class.
 
@@ -31,6 +31,8 @@ def train_model(dataset_config_name: str, model_config_name: str, train_config_n
     :param logs_path: Directory path where training logs and outputs will be saved respect to the base project
         directory.
     :param trainer_class: Class that inherits from PatchTSTTrainer and implements the training logic.
+    :param checkpoint_file_name: File name of the checkpoint respect to the model_checkpoint.save_directory in the
+        training.ini configuration file.
     """
     args = get_args()
     base_dir = Path(__file__).parent.parent
@@ -67,10 +69,11 @@ def train_model(dataset_config_name: str, model_config_name: str, train_config_n
     train_dataset, valid_dataset, test_dataset = torch.utils.data.random_split(dataset,
                                                                                [train_size, valid_size, test_size])
 
-    checkpoint = None
-    if args.checkpoint is not None:
-        checkpoint = f"{args.checkpoint}.ckpt"
-
+    if checkpoint_file_name is not None:
+        checkpoint = f"{checkpoint_file_name}.ckpt" if not checkpoint_file_name.endswith(
+            ".ckpt") else checkpoint_file_name
+    else:
+        checkpoint = None
     trainer = trainer_class(
         model_config=patch_tst_config,
         training_config=training_config,

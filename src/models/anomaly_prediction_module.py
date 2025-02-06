@@ -47,9 +47,11 @@ class AnomalyPredictionModule(pl.LightningModule, ABC):
         - Input: (batch_size, channels, seq_len)
         - Output: (batch_size, channels, pred_len)
     """
+
     def __init__(self, config_reader: ConfigReader, channels: int, pred_len: int, seq_len: int):
         super().__init__()
-        self.save_hyperparameters(config_reader.config_data, channels, pred_len, seq_len)
+        self.scheduler_state, self.optimizer_state = None, None
+        self.save_hyperparameters()
         # Loss Function
         loss_scaling_factor = config_reader.get_param('training.loss_scaling_factor', v_type=bool)
         self.loss_fn = WassersteinLoss(apply_scaling_factor=loss_scaling_factor)
@@ -195,10 +197,13 @@ class AnomalyPredictionModule(pl.LightningModule, ABC):
         # Get optimizer configuration
         optimizer_factory = OptimizerFactory(self.optimizer_config)
         optimizer = optimizer_factory.get_optimizer('adam', self.parameters())
-
+        if self.optimizer_state:
+            optimizer.load_state_dict(self.optimizer_state)
         # Get scheduler configuration
         scheduler_factory = SchedulerFactory(self.scheduler_config)
         scheduler = scheduler_factory.get_scheduler('steplr', optimizer)
+        if self.scheduler_state:
+            scheduler.load_state_dict(self.scheduler_state)
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
@@ -268,12 +273,8 @@ class AnomalyPredictionModule(pl.LightningModule, ABC):
             - Useful for loading parameters that cannot be handled by save_hyperparameters()
         """
         if 'optimizer_state' in checkpoint:
-            optimizer = self.optimizers()
-            state = checkpoint['optimizer_state']
-            optimizer.load_state_dict(state)
+            self.optimizer_state = checkpoint['optimizer_state']
 
         if 'scheduler_state' in checkpoint:
-            scheduler = self.lr_schedulers()
-            state = checkpoint['scheduler_state']
-            scheduler.load_state_dict(state)
+            self.scheduler_state = checkpoint['scheduler_state']
         self.on_load(checkpoint)

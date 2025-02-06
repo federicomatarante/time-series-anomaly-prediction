@@ -1,5 +1,4 @@
 from pathlib import Path
-from pathlib import Path
 from typing import Optional, Tuple
 
 from torch import nn
@@ -23,10 +22,10 @@ class BasePatchTSTTrainer(PatchTSTTrainer):
         # Setup model and checkpoint file
         if checkpoint_file:
             checkpoint_path = Path(self.checkpoint_dir) / Path(checkpoint_file)
-            if not self.checkpoint_path.exists():
-                raise ValueError(f"Checkpoint file not found: {self.checkpoint_path}")
+            if not checkpoint_path.exists():
+                raise ValueError(f"Checkpoint file not found: {checkpoint_path}")
             model = PatchTSTLightning.load_from_checkpoint(
-                self.checkpoint_path,
+                checkpoint_path,
                 model_config_reader=self.model_config,
                 training_config_reader=self.training_config
             )
