@@ -3,7 +3,9 @@ from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 from typing import Union
 import numpy as np
-
+import os
+import requests
+import tqdm
 
 class ESADataset(Dataset):
     """Dataset class for ESA-ADB dataset.
@@ -30,6 +32,9 @@ class ESADataset(Dataset):
     This demonstrates how to create an ESADataset instance and iterate through it using
     a DataLoader with specified batch size and no data shuffling.
     """
+    
+    BASE_URL = 'https://esa-adb-dataset-ej4ttgjkl.s3.eu-west-1.amazonaws.com/preprocess'
+
     def __init__(self, folder: str,
                 mission: Union[int, str],
                 period: str,
@@ -44,7 +49,21 @@ class ESADataset(Dataset):
         self.delta_t_y = None
         if isinstance(mission, int):
             mission = str(mission)
-        self.dataset = pd.read_csv(f"{folder}/ESA-Mission{mission}/{period}.{ds_type}.csv")
+        local_ds_file = f"{folder}/ESA-Mission{mission}/{period}.{ds_type}.csv"
+
+        if not os.path.isdir(f"{folder}/ESA-Mission{mission}"):
+            os.makedirs(f"{folder}/ESA-Mission{mission}")
+
+        if not os.path.isfile(local_ds_file):
+            res = requests.get(f"{self.BASE_URL}/{period}.{ds_type}.csv", stream=True)
+            length = int(res.headers.get('content-length', 0))
+            with tqdm.tqdm(total=length, unit='B', unit_scale=True, unit_divisor=1024) as pbar:
+                with open(local_ds_file, 'wb') as f:
+                    for data in res.iter_content(chunk_size=1024):
+                        f.write(data)
+                        pbar.update(len(data))
+
+        self.dataset = pd.read_csv(local_ds_file)
         self.n_channels = len(list(filter(lambda x: x.startswith('channel_'),  self.dataset.columns)))
         self.dataset.set_index("timestamp", inplace=True)
         self.dataset.index = pd.to_datetime(self.dataset.index)
