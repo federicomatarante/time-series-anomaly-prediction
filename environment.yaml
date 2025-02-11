@@ -1,4 +1,4 @@
-name: deep-learning
+name: elective-ai
 channels:
   - pytorch
   - nvidia
@@ -66,7 +66,6 @@ dependencies:
   - libtorch=2.5.1=cpu_mkl_h75fa98c_101
   - libuuid=1.41.5=h5eee18b_0
   - libuv=1.48.0=h5eee18b_0
-  - lightning=2.3.3=py312h06a4308_0
   - lightning-utilities=0.11.9=py312h06a4308_0
   - llvm-openmp=14.0.6=h9e868ea_0
   - markdown=3.4.1=py312h06a4308_0
