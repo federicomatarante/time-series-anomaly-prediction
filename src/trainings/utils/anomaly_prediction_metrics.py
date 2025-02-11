@@ -7,211 +7,125 @@ from torchmetrics import Metric
 
 
 class ExistenceOfAnomaly(Metric):
-    """
-    Evaluates if model correctly predicts existence of at least one anomaly within prediction range.
-    Adapted for batch processing with shape [batch_size, window_size].
-
-    Score ranges from 0 (worst) to 1 (best).
-
-    :param threshold: Value above which a prediction is considered an anomaly
-    :param kwargs: Additional arguments passed to parent Metric class
-    """
-
     def __init__(self, threshold: float = 0.5, **kwargs: Any):
         super().__init__(**kwargs)
         self.threshold = threshold
-        self.add_state("true_positives", default=torch.tensor(0), dist_reduce_fx="sum")
-        self.add_state("false_positives", default=torch.tensor(0), dist_reduce_fx="sum")
-        self.add_state("false_negatives", default=torch.tensor(0), dist_reduce_fx="sum")
+        # Use float tensors for better performance
+        self.add_state("true_positives", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("false_positives", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("false_negatives", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, targets: Tensor) -> None:
-        """
-        Update metric states from batch of predictions and targets.
-
-        :param preds: Model predictions [batch_size, channels, window_size]
-        :param targets: Ground truth labels [batch_size, channels, window_size]
-        :raises ValueError: If inputs have incorrect shapes
-        """
         if len(preds.shape) != 3 or preds.shape != targets.shape:
             raise ValueError(
-                f"Inputs must be 2D tensors of shape [batch_size, channels, window_size]. "
+                f"Inputs must be 3D tensors of shape [batch_size, channels, window_size]. "
                 f"Got predictions shape {preds.shape} and targets shape {targets.shape}")
-        preds = preds.flatten()
-        targets = targets.flatten()
-        # Check existence of anomalies in each sequence
-        pred_exists = (torch.sum(preds, dim=-1) >= self.threshold)
-        target_exists = (torch.sum(targets, dim=-1) >= self.threshold)
 
-        self.true_positives += torch.sum(pred_exists & target_exists)
-        self.false_positives += torch.sum(pred_exists & ~target_exists)
-        self.false_negatives += torch.sum(~pred_exists & target_exists)
+        # Vectorized operations across batch
+        pred_exists = (preds.sum(dim=(1, 2)) >= self.threshold)
+        target_exists = (targets.sum(dim=(1, 2)) >= self.threshold)
+
+        self.true_positives += (pred_exists & target_exists).float().sum()
+        self.false_positives += (pred_exists & ~target_exists).float().sum()
+        self.false_negatives += (~pred_exists & target_exists).float().sum()
 
     def compute(self) -> float:
-        """
-        Compute F1 score from accumulated statistics.
-
-        :return: F1 score between 0 and 1
-        """
-        return 2 * self.true_positives / (2 * self.true_positives + self.false_positives + self.false_negatives)
-
-    def reset(self):
-        """Reset metric states to initial values."""
-        self.true_positives.zero_()
-        self.false_positives.zero_()
-        self.false_negatives.zero_()
+        epsilon = 1e-7  # Prevent division by zero
+        numerator = 2 * self.true_positives + epsilon
+        denominator = 2 * self.true_positives + self.false_positives + self.false_negatives + epsilon
+        return (numerator / denominator)
 
 
 class DensityOfAnomalies(Metric):
-    """
-    Measures difference between predicted and actual anomaly densities across batches.
-
-    Score ranges from 0 (worst) to 1 (best).
-
-    :param kwargs: Additional arguments passed to parent Metric class
-    """
-
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
         self.add_state("cumulative_density", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("total", default=torch.tensor(0), dist_reduce_fx="sum")
 
-    def reset(self):
-        """Reset metric states to initial values."""
-        self.cumulative_density.zero_()
-        self.total.zero_()
-
     def update(self, preds: Tensor, targets: Tensor) -> None:
-        """
-        Update metric states from batch of predictions and targets.
-
-        :param preds: Model predictions [batch_size, channels, window_size]
-        :param targets: Ground truth labels [batch_size,  channels, window_size]
-        :raises ValueError: If inputs have incorrect shapes
-        """
         if len(preds.shape) != 3 or preds.shape != targets.shape:
             raise ValueError(
                 f"Inputs must be 3D tensors of shape [batch_size, channels, window_size]. "
                 f"Got predictions shape {preds.shape} and targets shape {targets.shape}")
 
-        # Compute density difference for each sequence in batch
-
-        self.cumulative_density += torch.abs(torch.sum(targets - preds))
+        # Vectorized absolute difference calculation
+        self.cumulative_density += (targets - preds).abs().sum()
         self.total += preds.numel()
 
     def compute(self) -> float:
-        """
-        Compute density similarity score from accumulated statistics.
-
-        :return: Score between 0 and 1
-        """
-        return 1 - self.cumulative_density / self.total
+        epsilon = 1e-7
+        return 1 - (self.cumulative_density / (self.total + epsilon))
 
 
 class LeadTime(Metric):
-    """
-    Measures temporal distance between first predicted and first actual anomaly in each sequence.
-
-    Score ranges from 0 (worst) to 1 (best), or inf if no anomalies found.
-
-    :param threshold: Value above which a prediction is considered an anomaly
-    :param kwargs: Additional arguments passed to parent Metric class
-    """
-
     def __init__(self, threshold: float = 0.5, **kwargs: Any):
         super().__init__(**kwargs)
         self.threshold = threshold
         self.add_state("cumulative_distance", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("total_length", default=torch.tensor(0), dist_reduce_fx="sum")
-
-    def reset(self) -> None:
-        """Reset metric states to initial values."""
-        self.cumulative_distance.zero_()
-        self.total_length.zero_()
+        self.add_state("valid_sequences", default=torch.tensor(0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, targets: Tensor) -> None:
-        """
-        Update metric states from batch of predictions and targets.
-
-        :param preds: Model predictions [batch_size, channels, window_size]
-        :param targets: Ground truth labels [batch_size, channels, window_size]
-        :raises ValueError: If inputs have incorrect shapes
-        """
         if len(preds.shape) != 3 or preds.shape != targets.shape:
             raise ValueError(
                 f"Inputs must be 3D tensors of shape [batch_size, channels, window_size]. "
                 f"Got predictions shape {preds.shape} and targets shape {targets.shape}")
 
-        batch_size, channels, windows_size = preds.shape
+        batch_size, channels, window_size = preds.shape
         self.total_length += preds.numel()
 
-        for b in range(batch_size):
-            for c in range(channels):
-                curr_preds = preds[b][c]
-                curr_targets = targets[b][c]
-                pred_indices = torch.nonzero(curr_preds >= self.threshold)
-                target_indices = torch.nonzero(curr_targets >= self.threshold)
-                if len(pred_indices) > 0 and len(target_indices) > 0:
-                    # Get first occurrence of anomaly in both sequences
-                    first_pred = pred_indices[0]
-                    first_target = target_indices[0]
-                    self.cumulative_distance += torch.abs(torch.sum(first_pred - first_target)).item()
+        # Create masks for anomalies
+        pred_mask = preds >= self.threshold
+        target_mask = targets >= self.threshold
+
+        # Find first anomaly indices for all sequences at once
+        first_pred = torch.argmax((pred_mask).float(), dim=2)  # [batch_size, channels]
+        first_target = torch.argmax((target_mask).float(), dim=2)  # [batch_size, channels]
+
+        # Create validity mask for sequences that have both predicted and actual anomalies
+        pred_valid = pred_mask.any(dim=2)  # [batch_size, channels]
+        target_valid = target_mask.any(dim=2)  # [batch_size, channels]
+        valid_sequences = pred_valid & target_valid
+
+        # Calculate distances only for valid sequences
+        distances = torch.abs(first_pred - first_target)
+        distances = distances * valid_sequences  # Zero out invalid sequences
+        
+        self.cumulative_distance += distances.sum()
+        self.valid_sequences += valid_sequences.sum()
 
     def compute(self) -> float:
-        """
-        Compute lead time score from accumulated statistics.
-
-        :return: Score between 0 and 1, or inf if no valid sequences found
-        """
-
-        return 1 - self.cumulative_distance / self.total_length
+        epsilon = 1e-7
+        if self.valid_sequences == 0:
+            return float('inf')
+        return 1 - (self.cumulative_distance / (self.total_length + epsilon))
 
 
 class DiceScore(Metric):
-    """
-    Measures overlap between predicted and actual anomalies using Dice coefficient.
-    Adapted for batch processing.
-
-    Score ranges from 0 (no overlap) to 1 (perfect overlap).
-
-    :param threshold: Value above which a prediction is considered an anomaly
-    :param kwargs: Additional arguments passed to parent Metric class
-    """
-
     def __init__(self, threshold: float = 0.5, **kwargs: Any):
         super().__init__(**kwargs)
         self.threshold = threshold
-        self.add_state("pred_positives", default=torch.tensor(0), dist_reduce_fx="sum")
-        self.add_state("target_positives", default=torch.tensor(0), dist_reduce_fx="sum")
-        self.add_state("common_predicted_positives", default=torch.tensor(0), dist_reduce_fx="sum")
-
-    def reset(self) -> None:
-        """Reset metric states to initial values."""
-        self.pred_positives.zero_()
-        self.target_positives.zero_()
-        self.common_predicted_positives.zero_()
+        self.add_state("pred_positives", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("target_positives", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("common_predicted_positives", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, targets: Tensor) -> None:
-        """
-        Update metric states from batch of predictions and targets.
-
-        :param preds: Model predictions [batch_size, channels, window_size]
-        :param targets: Ground truth labels [batch_size, channels, window_size]
-        :raises ValueError: If inputs have incorrect shapes
-        """
         if len(preds.shape) != 3 or preds.shape != targets.shape:
             raise ValueError(
-                f"Inputs must be 2D tensors of shape [batch_size, channels, window_size]. "
+                f"Inputs must be 3D tensors of shape [batch_size, channels, window_size]. "
                 f"Got predictions shape {preds.shape} and targets shape {targets.shape}")
+
+        # Create boolean masks once
         pred_mask = preds >= self.threshold
         target_mask = targets >= self.threshold
-        self.pred_positives += torch.sum(pred_mask)
-        self.target_positives += torch.sum(target_mask)
-        self.common_predicted_positives += torch.sum(pred_mask & target_mask)
+
+        # Use float operations for better performance
+        self.pred_positives += pred_mask.float().sum()
+        self.target_positives += target_mask.float().sum()
+        self.common_predicted_positives += (pred_mask & target_mask).float().sum()
 
     def compute(self) -> float:
-        """
-        Compute Dice score from accumulated statistics.
-
-        :return: Score between 0 and 1
-        """
-        return 2 * self.common_predicted_positives / (self.pred_positives + self.target_positives)
+        epsilon = 1e-7
+        numerator = 2 * self.common_predicted_positives + epsilon
+        denominator = self.pred_positives + self.target_positives + epsilon
+        return (numerator / denominator)
