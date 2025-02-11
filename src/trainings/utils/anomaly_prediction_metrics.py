@@ -35,7 +35,6 @@ class ExistenceOfAnomaly(Metric):
         denominator = 2 * self.true_positives + self.false_positives + self.false_negatives + epsilon
         return (numerator / denominator)
 
-
 class DensityOfAnomalies(Metric):
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
@@ -55,7 +54,6 @@ class DensityOfAnomalies(Metric):
     def compute(self) -> float:
         epsilon = 1e-7
         return 1 - (self.cumulative_density / (self.total + epsilon))
-
 
 class LeadTime(Metric):
     def __init__(self, threshold: float = 0.5, **kwargs: Any):
@@ -99,7 +97,6 @@ class LeadTime(Metric):
         if self.valid_sequences == 0:
             return float('inf')
         return 1 - (self.cumulative_distance / (self.total_length + epsilon))
-
 
 class DiceScore(Metric):
     def __init__(self, threshold: float = 0.5, **kwargs: Any):
