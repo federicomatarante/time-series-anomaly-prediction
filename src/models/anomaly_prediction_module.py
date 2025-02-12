@@ -54,7 +54,7 @@ class AnomalyPredictionModule(pl.LightningModule, ABC):
         self.save_hyperparameters()
         # Loss Function
         loss_scaling_factor = config_reader.get_param('training.loss_scaling_factor', v_type=bool)
-        loss_weight = config_reader.get_param("training.loss_weight", v_type=float, nullable=True, default=None)
+        loss_weight = config_reader.get_param("training.loss_weight", v_type=float, nullable=True)
         self.loss_fn = WassersteinLoss(apply_scaling_factor=loss_scaling_factor, weight=loss_weight)
         # Scheduler and optimizer parameters
         self.scheduler_config = config_reader.sub_reader({'scheduler', 'scheduler.StepLR'})

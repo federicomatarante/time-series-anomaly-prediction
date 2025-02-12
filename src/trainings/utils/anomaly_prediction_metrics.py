@@ -94,8 +94,6 @@ class LeadTime(Metric):
 
     def compute(self) -> float:
         epsilon = 1e-7
-        if self.valid_sequences == 0:
-            return float('inf')
         return 1 - (self.cumulative_distance / (self.total_length + epsilon))
 
 class DiceScore(Metric):
@@ -125,4 +123,4 @@ class DiceScore(Metric):
         epsilon = 1e-7
         numerator = 2 * self.common_predicted_positives + epsilon
         denominator = self.pred_positives + self.target_positives + epsilon
-        return (numerator / denominator)
+        return numerator / denominator
