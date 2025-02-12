@@ -3,11 +3,14 @@ import torch.nn as nn
 from torch import Tensor
 
 
-def wasserstein_distance(y_pred: Tensor, y_true: Tensor, apply_scaling_factor=False) -> Tensor:
+def wasserstein_distance(y_pred: Tensor, y_true: Tensor, apply_scaling_factor=False, weight: int = None) -> Tensor:
     """
     Compute the Wasserstein distance between predicted and true time series.
     :param y_pred: Predicted time series tensor. Shape: (batch_size, channels, window_size)
     :param y_true: True time series tensor. Shape: (batch_size, channels, window_size)
+    :param apply_scaling_factor: whether to apply scaling factor or not.
+    :param weight: weight to apply to samples in batches which have at least one anomaly. Samples without anomalies are
+        considered with 1 weight. If not set, the loss is not weighted.
     :return: Wasserstein distance scalar
     :raises ValueError: If input tensors don't have 3 dimensions, shapes don't match
     """
@@ -18,20 +21,25 @@ def wasserstein_distance(y_pred: Tensor, y_true: Tensor, apply_scaling_factor=Fa
     if y_true.shape != y_pred.shape:
         raise ValueError(f"Shape mismatch: y_pred shape {y_pred.shape} != y_true shape {y_true.shape}")
 
-    T = y_pred.size(2)  # sequence length
-    C = y_pred.size(1) # Number of channels
+    C = y_pred.size(1)  # Number of channels
     abs_diff = torch.abs(y_pred - y_true)  # Shape: [B, C, T]
-    T = abs_diff.shape[2]
+    T = abs_diff.shape[2]  # Seq length
     mask = torch.triu(torch.ones(T, T)).to(abs_diff.device)  # Shape: [T, T]
     abs_diff = abs_diff.transpose(1, 2)  # Shape: [B, T, C]
     masked_sums = abs_diff.unsqueeze(2) * mask.unsqueeze(0).unsqueeze(-1)
 
-    channel_sums = masked_sums.sum(dim=2)  # Shape: [B, T, C]    
+    channel_sums = masked_sums.sum(dim=2)  # Shape: [B, T, C]
     channel_sums = channel_sums.sum(dim=1)  # Shape: [B, C]
     scaling = (2 / (T * C * (T + 1))) if apply_scaling_factor else 1
-    wass_2 = scaling * channel_sums.sum(dim=1).mean()  # Scalar
-    
-    return wass_2
+    wass_2 = scaling * channel_sums.sum(dim=1)  # Scalar
+    if weight:
+        condition = (y_true.flatten(1, 2) > 0).any(dim=-1)
+        inv_condition = ~condition
+        weights: Tensor = condition * weight + inv_condition * 1
+        weighted_wass = torch.sum(wass_2 * weights) / torch.sum(weights)
+        return weighted_wass
+    else:
+        return wass_2.mean()
 
 
 class WassersteinLoss(nn.Module):
@@ -41,14 +49,19 @@ class WassersteinLoss(nn.Module):
     Implements the Wasserstein distance metric as a PyTorch loss function.
     Supports both 2D tensors (batch_size, sequence_length) and
     3D tensors (batch_size, sequence_length, 1).
+
+    :param apply_scaling_factor: whether to apply scaling factor or not.
+    :param weight: weight to apply to samples in batches which have at least one anomaly. Samples without anomalies are
+        considered with 1 weight. If not set, the loss is not weighted.
     """
 
-    def __init__(self, apply_scaling_factor=True):
+    def __init__(self, apply_scaling_factor=True, weight=None):
         """
         Initialize the WassersteinLoss module.
         """
         super(WassersteinLoss, self).__init__()
         self.apply_scaling_factor = apply_scaling_factor
+        self.weight = weight
 
     def forward(self, y_pred: Tensor, y_true: Tensor) -> Tensor:
         """
@@ -97,4 +110,4 @@ class WassersteinLoss(nn.Module):
              loss_3d = criterion(pred_3d, true_3d)
              print(loss_3d)  # Example output: tensor(0.1123)
         """
-        return wasserstein_distance(y_pred, y_true, apply_scaling_factor=self.apply_scaling_factor)
+        return wasserstein_distance(y_pred, y_true, apply_scaling_factor=self.apply_scaling_factor, weight=self.weight)
