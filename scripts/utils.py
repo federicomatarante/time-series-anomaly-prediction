@@ -57,7 +57,6 @@ def train_model(dataset_config_name: str, model_config_name: str, train_config_n
 
     # split_ratio = dataset_config.get_param('dataset.train_split', v_type=float)
     valid_split = dataset_config_name.get_param('dataset.valid_split', v_type=float)
-    test_split = dataset_config_name.get_param('dataset.test_split', v_type=float)
 
     dataset = ESADataset(**dataset_args)
     # dataset = Subset(dataset, range(2000))
