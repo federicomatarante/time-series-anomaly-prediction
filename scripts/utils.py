@@ -63,12 +63,19 @@ def train_model(dataset_config_name: str, model_config_name: str, train_config_n
     # dataset = Subset(dataset, range(2000))
     dataset_size = len(dataset)
     valid_size = int(valid_split * dataset_size)
-    test_size = int(test_split * dataset_size)
-    train_size = dataset_size - (valid_size + test_size)
+    train_size = dataset_size - (valid_size)
 
-    train_dataset, valid_dataset, test_dataset = torch.utils.data.random_split(dataset,
-                                                                               [train_size, valid_size, test_size])
-
+    train_dataset, valid_dataset = torch.utils.data.random_split(dataset,
+                                                                               [train_size, valid_size])
+    test_dataset = ESADataset(
+        folder=dataset_args['folder'],
+        mission=1,
+        period="84_months",
+        ds_type='test',
+        window_size=dataset_args['window_size'],
+        horizon_size=dataset_args['horizon_size'],
+        stride=5,
+    )
     if checkpoint_file_name is not None:
         checkpoint = f"{checkpoint_file_name}.ckpt" if not checkpoint_file_name.endswith(
             ".ckpt") else checkpoint_file_name
