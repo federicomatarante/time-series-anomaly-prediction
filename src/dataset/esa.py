@@ -82,10 +82,10 @@ class ESADataset(Dataset):
         self.end_time = self.channels.index[-1]
     
     def __len__(self):
-        return len(self.dataset.index) - (self.window_size+self.horizon_size+1)
+        return (len(self.dataset.index) - (self.window_size+self.horizon_size+1))//self.stride
     
     def __getitem__(self, idx):
-        start_index = self.start_time + self.delta_index*idx
+        start_index = self.start_time + self.delta_index*idx*self.stride
         end_index = start_index + self.delta_index*(self.window_size - 1)
 
         start_horizon_index = end_index + self.delta_index
