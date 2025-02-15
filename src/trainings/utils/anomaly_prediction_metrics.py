@@ -31,7 +31,7 @@ class ExistenceOfAnomaly(Metric):
 
     def compute(self) -> float:
         epsilon = 1e-7  # Prevent division by zero
-        numerator = 2 * self.true_positives + epsilon
+        numerator = 2 * self.true_positives
         denominator = 2 * self.true_positives + self.false_positives + self.false_negatives + epsilon
         return (numerator / denominator)
 

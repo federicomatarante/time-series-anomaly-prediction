@@ -9,6 +9,7 @@ from torch import Tensor
 from torch import nn
 
 from src.patchtst.layers.PatchTST_layers import *
+from src.trainings.utils.config_enums_utils import get_activation_fn
 from src.patchtst.layers.RevIN import RevIN
 
 
