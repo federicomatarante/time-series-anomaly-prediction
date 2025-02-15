@@ -3,6 +3,7 @@ from torch import nn, Tensor
 from src.models.anomaly_prediction_module import AnomalyPredictionModule
 from src.models.modules.camsa_patch_tst import CAMSAPatchTST
 from src.models.modules.graph_encoder import GraphCorrelationEncoder
+from src.models.utils import init_transformer_encoder_weights, init_mlp_classifier_weights, init_gcn_weights
 from src.trainings.utils.config_enums_utils import get_activation_fn
 from src.utils.config.config_reader import ConfigReader
 
@@ -78,7 +79,9 @@ class CPatchTSTLightning(AnomalyPredictionModule):
         PatchTST encoder with Graph Correlation Encoder and CAMSA attention..
         """
         graph_encoder = GraphCorrelationEncoder(self.model_config)
+        init_gcn_weights(graph_encoder)
         camsa_patch_tst = CAMSAPatchTST(self.model_config)
+        init_transformer_encoder_weights(camsa_patch_tst)
         return CAMSAModule(graph_encoder, camsa_patch_tst)
 
     def _setup_classifier(self) -> nn.Module:
@@ -105,4 +108,5 @@ class CPatchTSTLightning(AnomalyPredictionModule):
         ])
 
         classifier = nn.Sequential(*layers)
+        init_mlp_classifier_weights(classifier)
         return classifier

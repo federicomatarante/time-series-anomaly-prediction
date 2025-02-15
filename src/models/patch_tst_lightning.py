@@ -1,11 +1,14 @@
 from torch import nn
 
 from src.models.anomaly_prediction_module import AnomalyPredictionModule
-from src.models.utils import Permute
+from src.models.utils import Permute, init_transformer_encoder_weights, init_mlp_classifier_weights
 from src.trainings.utils.config_enums_utils import get_activation_fn
 from src.utils.config.config_reader import ConfigReader
 
 from src.patchtst.models.PatchTST import Model as PatchTST
+
+
+
 
 
 class PatchTSTLightning(AnomalyPredictionModule):
@@ -38,6 +41,7 @@ class PatchTSTLightning(AnomalyPredictionModule):
         PatchTST standard encoder.
         """
         encoder = PatchTST(self.model_config_reader)
+        init_transformer_encoder_weights(encoder)
         permute = Permute(0, 2, 1)
         return nn.Sequential(
             permute, encoder, permute
@@ -67,4 +71,5 @@ class PatchTSTLightning(AnomalyPredictionModule):
         ])
 
         classifier = nn.Sequential(*layers)
+        init_mlp_classifier_weights(classifier)
         return classifier

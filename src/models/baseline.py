@@ -3,6 +3,7 @@ from typing import Tuple
 from torch import nn
 
 from src.models.anomaly_prediction_module import AnomalyPredictionModule
+from src.models.utils import init_mlp_classifier_weights
 from src.trainings.utils.config_enums_utils import get_activation_fn
 from src.utils.config.config_reader import ConfigReader
 
@@ -64,4 +65,5 @@ class AnomalyPredictionBaseline(AnomalyPredictionModule):
         ])
 
         classifier = nn.Sequential(*layers)
+        init_mlp_classifier_weights(classifier)
         return classifier
