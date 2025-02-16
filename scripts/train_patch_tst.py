@@ -5,7 +5,7 @@ import sys
 if __name__ == '__main__':
     ckpt_name = None if len(sys.argv) < 2 else sys.argv[1]
     train_model(
-        dataset_config_name='esa.ini',
+        dataset_config_name='dataset.ini',
         model_config_name='patchtst.ini',
         train_config_name='training.ini',
         logs_path='logs/patch_tst_training',

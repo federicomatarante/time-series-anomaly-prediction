@@ -121,8 +121,8 @@ class MSLDataset(Dataset):
                 if pred_end > num_values:
                     break
                 # Cut and also converted to shape (channels, seq_len)
-                sequence_piece = sequence_tensor[seq_start:seq_end, :]
-                anomaly_piece = anomalies_tensor[seq_end:pred_end, :]
+                sequence_piece = sequence_tensor[seq_start:seq_end, :].transpose(0, 1).float()
+                anomaly_piece = anomalies_tensor[seq_end:pred_end, :].transpose(0, 1).float()
 
                 dataset.append((sequence_piece, anomaly_piece))
         self.dataset = dataset

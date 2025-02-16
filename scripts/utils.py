@@ -6,6 +6,7 @@ from typing import Type
 import torch
 
 from src.dataset.esa import ESADataset
+from src.dataset.msl import MSLDataset
 from src.trainings.patch_tst_trainer import PatchTSTTrainer
 from src.utils.config.ini_config_reader import INIConfigReader
 
@@ -45,41 +46,33 @@ def train_model(dataset_config_name: str, model_config_name: str, train_config_n
     patch_tst_config = INIConfigReader(configs_dir / model_config_name, base_path=logs_dir)
     training_config = INIConfigReader(configs_dir / train_config_name, base_path=logs_dir)
 
-    dataset_args = {
-        'folder': dataset_config_name.get_param('dataset.folder', v_type=Path),
-        'mission': dataset_config_name.get_param('dataset.mission', v_type=str),
-        'period': dataset_config_name.get_param('dataset.period', v_type=str),
-        'ds_type': dataset_config_name.get_param('dataset.type', v_type=str, domain={'train', 'val', 'test'}),
-        'window_size': patch_tst_config.get_param('seq.len', v_type=int),
-        'horizon_size': patch_tst_config.get_param('pred.len', v_type=int),
-        'stride': dataset_config_name.get_param('windows.stride', v_type=int),
-    }
-
     valid_split = dataset_config_name.get_param('dataset.valid_split', v_type=float)
 
-    train_dataset = ESADataset(**dataset_args)
-
-    test_dataset_full = ESADataset(
-        folder=dataset_args['folder'],
-        mission=1,
-        period="84_months",
-        ds_type='test',
-        window_size=dataset_args['window_size'],
-        horizon_size=dataset_args['horizon_size'],
-        stride=5,
+    train_dataset = MSLDataset(
+        ds_type="train",
+        window_size=dataset_config_name.get_param("train.window_size", v_type=int),
+        horizon_size=dataset_config_name.get_param("train.horizon_size", v_type=int),
+        stride=dataset_config_name.get_param("train.stride", v_type=int),
     )
-    dataset_size = len(test_dataset_full)
+
+    test_dataset = MSLDataset(
+        ds_type="test",
+        window_size=dataset_config_name.get_param("test.window_size", v_type=int),
+        horizon_size=dataset_config_name.get_param("test.horizon_size", v_type=int),
+        stride=dataset_config_name.get_param("test.stride", v_type=int),
+    )
+    dataset_size = len(train_dataset)
     valid_size = int(valid_split * dataset_size)
     test_size = dataset_size - (valid_size)
 
-    test_dataset, valid_dataset = torch.utils.data.random_split(test_dataset_full,
-                                                                               [test_size, valid_size])
+    train_dataset, valid_dataset = torch.utils.data.random_split(train_dataset,
+                                                                 [test_size, valid_size])
     if checkpoint_file_name is not None:
         checkpoint = f"{checkpoint_file_name}.ckpt" if not checkpoint_file_name.endswith(
             ".ckpt") else checkpoint_file_name
     else:
         checkpoint = None
-    
+
     trainer = trainer_class(
         model_config=patch_tst_config,
         training_config=training_config,
