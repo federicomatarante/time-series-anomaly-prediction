@@ -1,9 +1,15 @@
-import math
 from typing import Any
 
 import torch
 from torch import Tensor
 from torchmetrics import Metric
+
+
+def any_predicted_anomaly(preds: Tensor, targets: Tensor, threshold: float) -> bool:
+    pred_exists = (preds.sum(dim=(1, 2)) >= threshold)
+    target_exists = (targets.sum(dim=(1, 2)) >= threshold)
+
+    return (pred_exists & target_exists).any().item()
 
 
 class ExistenceOfAnomaly(Metric):
@@ -35,6 +41,7 @@ class ExistenceOfAnomaly(Metric):
         denominator = 2 * self.true_positives + self.false_positives + self.false_negatives + epsilon
         return (numerator / denominator)
 
+
 class DensityOfAnomalies(Metric):
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
@@ -46,7 +53,8 @@ class DensityOfAnomalies(Metric):
             raise ValueError(
                 f"Inputs must be 3D tensors of shape [batch_size, channels, window_size]. "
                 f"Got predictions shape {preds.shape} and targets shape {targets.shape}")
-
+        if not any_predicted_anomaly(preds, targets, 0.1):
+            return
         # Vectorized absolute difference calculation
         self.cumulative_density += (targets - preds).abs().sum()
         self.total += preds.numel()
@@ -54,6 +62,7 @@ class DensityOfAnomalies(Metric):
     def compute(self) -> float:
         epsilon = 1e-7
         return 1 - (self.cumulative_density / (self.total + epsilon))
+
 
 class LeadTime(Metric):
     def __init__(self, threshold: float = 0.5, **kwargs: Any):
@@ -68,6 +77,9 @@ class LeadTime(Metric):
             raise ValueError(
                 f"Inputs must be 3D tensors of shape [batch_size, channels, window_size]. "
                 f"Got predictions shape {preds.shape} and targets shape {targets.shape}")
+
+        if not any_predicted_anomaly(preds, targets, self.threshold):
+            return
 
         batch_size, channels, window_size = preds.shape
         self.total_length += preds.numel()
@@ -88,13 +100,14 @@ class LeadTime(Metric):
         # Calculate distances only for valid sequences
         distances = torch.abs(first_pred - first_target)
         distances = distances * valid_sequences  # Zero out invalid sequences
-        
+
         self.cumulative_distance += distances.sum()
         self.valid_sequences += valid_sequences.sum()
 
     def compute(self) -> float:
         epsilon = 1e-7
         return 1 - (self.cumulative_distance / (self.total_length + epsilon))
+
 
 class DiceScore(Metric):
     def __init__(self, threshold: float = 0.5, **kwargs: Any):
@@ -110,6 +123,8 @@ class DiceScore(Metric):
                 f"Inputs must be 3D tensors of shape [batch_size, channels, window_size]. "
                 f"Got predictions shape {preds.shape} and targets shape {targets.shape}")
 
+        if not any_predicted_anomaly(preds, targets, self.threshold):
+            return
         # Create boolean masks once
         pred_mask = preds >= self.threshold
         target_mask = targets >= self.threshold
