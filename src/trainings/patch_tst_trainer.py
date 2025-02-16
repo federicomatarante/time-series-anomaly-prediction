@@ -222,6 +222,7 @@ class PatchTSTTrainer(ABC):
             shuffle=False,
             pin_memory=True,
             persistent_workers=True,
+            drop_last=True,
             collate_fn=collate_batch,
 
         )
@@ -234,6 +235,7 @@ class PatchTSTTrainer(ABC):
             pin_memory=True,
             persistent_workers=True,
             collate_fn=collate_batch,
+            drop_last=True,
         )
 
         return train_loader, val_loader
@@ -385,7 +387,8 @@ class PatchTSTTrainer(ABC):
                 batch_size=self.batch_size,
                 num_workers=self.num_workers,
                 shuffle=False,
-                pin_memory=True
+                pin_memory=True,
+                drop_last=True,
             )
 
         # Run test

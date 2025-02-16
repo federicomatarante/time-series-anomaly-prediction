@@ -5,11 +5,12 @@ from torch import Tensor
 from torchmetrics import Metric
 
 
-def any_predicted_anomaly(preds: Tensor, targets: Tensor, threshold: float) -> bool:
-    pred_exists = (preds.sum(dim=(1, 2)) >= threshold)
-    target_exists = (targets.sum(dim=(1, 2)) >= threshold)
+def any_predicted_anomaly(preds: Tensor, targets: Tensor, threshold: float):
+    pred_exists = (preds.sum(dim=2) >= threshold)
+    target_exists = (targets.sum(dim=2) >= threshold)
 
-    return (pred_exists & target_exists).any().item()
+    tp_mask = (pred_exists & target_exists)
+    return tp_mask
 
 
 class ExistenceOfAnomaly(Metric):
@@ -28,16 +29,16 @@ class ExistenceOfAnomaly(Metric):
                 f"Got predictions shape {preds.shape} and targets shape {targets.shape}")
 
         # Vectorized operations across batch
-        pred_exists = (preds.sum(dim=(1, 2)) >= self.threshold)
-        target_exists = (targets.sum(dim=(1, 2)) >= self.threshold)
+        pred_exists = (preds.sum(dim=(2)) >= self.threshold)
+        target_exists = (targets.sum(dim=(2)) >= self.threshold)
 
-        self.true_positives += (pred_exists & target_exists).float().sum()
-        self.false_positives += (pred_exists & ~target_exists).float().sum()
-        self.false_negatives += (~pred_exists & target_exists).float().sum()
+        self.true_positives += (pred_exists & target_exists).float().sum(dim=1).mean()
+        self.false_positives += (pred_exists & ~target_exists).float().sum(dim=1).mean()
+        self.false_negatives += (~pred_exists & target_exists).float().sum(dim=1).mean()
 
     def compute(self) -> float:
         epsilon = 1e-7  # Prevent division by zero
-        numerator = 2 * self.true_positives + epsilon
+        numerator = 2 * self.true_positives
         denominator = 2 * self.true_positives + self.false_positives + self.false_negatives + epsilon
         return (numerator / denominator)
 
@@ -45,7 +46,7 @@ class ExistenceOfAnomaly(Metric):
 class DensityOfAnomalies(Metric):
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
-        self.add_state("cumulative_density", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("cumulative_density", default=torch.zeros([128, 55]), dist_reduce_fx="sum")
         self.add_state("total", default=torch.tensor(0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, targets: Tensor) -> None:
@@ -53,24 +54,25 @@ class DensityOfAnomalies(Metric):
             raise ValueError(
                 f"Inputs must be 3D tensors of shape [batch_size, channels, window_size]. "
                 f"Got predictions shape {preds.shape} and targets shape {targets.shape}")
-        if not any_predicted_anomaly(preds, targets, 0.1):
+        tp_mask = any_predicted_anomaly(preds, targets, 0.1)
+        if not tp_mask.any().item():
             return
         # Vectorized absolute difference calculation
-        self.cumulative_density += (targets - preds).abs().sum()
+        self.cumulative_density += (targets - preds).sum(dim=2).abs() * tp_mask
         self.total += preds.numel()
 
     def compute(self) -> float:
         epsilon = 1e-7
-        return 1 - (self.cumulative_density / (self.total + epsilon))
+        return 1 - (self.cumulative_density / (self.total + epsilon)).mean()
 
 
 class LeadTime(Metric):
     def __init__(self, threshold: float = 0.5, **kwargs: Any):
         super().__init__(**kwargs)
         self.threshold = threshold
-        self.add_state("cumulative_distance", default=torch.tensor(0.0), dist_reduce_fx="sum")
-        self.add_state("total_length", default=torch.tensor(0), dist_reduce_fx="sum")
-        self.add_state("valid_sequences", default=torch.tensor(0), dist_reduce_fx="sum")
+        self.add_state("cumulative_distance", default=torch.zeros(128, 55), dist_reduce_fx="sum")
+        self.add_state("total_length", default=torch.zeros(128, 55), dist_reduce_fx="sum")
+        self.add_state("valid_sequences", default=torch.zeros(128, 55), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, targets: Tensor) -> None:
         if len(preds.shape) != 3 or preds.shape != targets.shape:
@@ -78,7 +80,8 @@ class LeadTime(Metric):
                 f"Inputs must be 3D tensors of shape [batch_size, channels, window_size]. "
                 f"Got predictions shape {preds.shape} and targets shape {targets.shape}")
 
-        if not any_predicted_anomaly(preds, targets, self.threshold):
+        tp_mask = any_predicted_anomaly(preds, targets, 0.1)
+        if not tp_mask.any().item():
             return
 
         batch_size, channels, window_size = preds.shape
@@ -101,21 +104,21 @@ class LeadTime(Metric):
         distances = torch.abs(first_pred - first_target)
         distances = distances * valid_sequences  # Zero out invalid sequences
 
-        self.cumulative_distance += distances.sum()
-        self.valid_sequences += valid_sequences.sum()
+        self.cumulative_distance += distances.sum() * tp_mask
+        self.valid_sequences += valid_sequences.sum() * tp_mask
 
     def compute(self) -> float:
         epsilon = 1e-7
-        return 1 - (self.cumulative_distance / (self.total_length + epsilon))
+        return 1 - (self.cumulative_distance / (self.total_length + epsilon)).mean()
 
 
 class DiceScore(Metric):
     def __init__(self, threshold: float = 0.5, **kwargs: Any):
         super().__init__(**kwargs)
         self.threshold = threshold
-        self.add_state("pred_positives", default=torch.tensor(0.0), dist_reduce_fx="sum")
-        self.add_state("target_positives", default=torch.tensor(0.0), dist_reduce_fx="sum")
-        self.add_state("common_predicted_positives", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("pred_positives", default=torch.zeros(128, 55), dist_reduce_fx="sum")
+        self.add_state("target_positives", default=torch.zeros(128, 55), dist_reduce_fx="sum")
+        self.add_state("common_predicted_positives", default=torch.zeros(128, 55), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, targets: Tensor) -> None:
         if len(preds.shape) != 3 or preds.shape != targets.shape:
@@ -123,19 +126,20 @@ class DiceScore(Metric):
                 f"Inputs must be 3D tensors of shape [batch_size, channels, window_size]. "
                 f"Got predictions shape {preds.shape} and targets shape {targets.shape}")
 
-        if not any_predicted_anomaly(preds, targets, self.threshold):
+        tp_mask = any_predicted_anomaly(preds, targets, 0.1)
+        if not tp_mask.any().item():
             return
         # Create boolean masks once
         pred_mask = preds >= self.threshold
         target_mask = targets >= self.threshold
 
         # Use float operations for better performance
-        self.pred_positives += pred_mask.float().sum()
-        self.target_positives += target_mask.float().sum()
-        self.common_predicted_positives += (pred_mask & target_mask).float().sum()
+        self.pred_positives += pred_mask.float().sum() * tp_mask
+        self.target_positives += target_mask.float().sum() * tp_mask
+        self.common_predicted_positives += (pred_mask & target_mask).float().sum() * tp_mask
 
     def compute(self) -> float:
         epsilon = 1e-7
-        numerator = 2 * self.common_predicted_positives + epsilon
+        numerator = 2 * self.common_predicted_positives
         denominator = self.pred_positives + self.target_positives + epsilon
-        return numerator / denominator
+        return (numerator / denominator).mean()
