@@ -1,9 +1,9 @@
 from torch import nn, Tensor
 
-from src.models.anomaly_prediction_module import AnomalyPredictionModule
+from src.models.anomaly_prediction_module import AnomalyDetectionModule
 from src.models.modules.camsa_patch_tst import CAMSAPatchTST
 from src.models.modules.graph_encoder import GraphCorrelationEncoder
-from src.models.utils import init_transformer_encoder_weights, init_mlp_classifier_weights, init_gcn_weights
+from src.models.utils import init_transformer_encoder_weights, init_gcn_weights, ActivationFunction
 from src.trainings.utils.config_enums_utils import get_activation_fn
 from src.utils.config.config_reader import ConfigReader
 
@@ -15,6 +15,7 @@ class CAMSAModule(nn.Module):
     :param graph_encoder: graph encoder to use in the module.
     :param camsa_patch_tst: path tst to use in the module.
     """
+
     def __init__(self, graph_encoder: GraphCorrelationEncoder, camsa_patch_tst: CAMSAPatchTST):
         super().__init__()
         self.graph_encoder = graph_encoder
@@ -32,8 +33,7 @@ class CAMSAModule(nn.Module):
         return y
 
 
-class CPatchTSTLightning(AnomalyPredictionModule):
-
+class CPatchTSTLightning(AnomalyDetectionModule):
     """
     Implementation of the AnomalyPredictionModule.
     A Correlation-aware Patch Time Series Transformer model for time series prediction.
@@ -61,20 +61,17 @@ class CPatchTSTLightning(AnomalyPredictionModule):
     def __init__(self, model_config: ConfigReader, training_config: ConfigReader):
         # Encoder
         self.model_config = model_config
-        # Classifier parameters
-        self.c_layers_sizes = model_config.get_collection('classifier.layers_sizes', v_type=int,
-                                                          collection_type=tuple)
-        self.c_hidden_act = model_config.get_param('classifier.activation.hidden', v_type=str)
-        self.c_output_act = model_config.get_param('classifier.activation.output', v_type=str)
-        self.c_dropout = model_config.get_param('dropout.classifier', v_type=float)
 
         # Data characteristics
         self.channels = model_config.get_param('data.enc_in', v_type=int)
         self.pred_len = model_config.get_param('pred.len', v_type=int)
         self.seq_len = model_config.get_param('seq.len', v_type=int)
+
+        self.output_act = model_config.get_param('head.output_act', v_type=str)
+
         super().__init__(training_config, self.channels, self.pred_len, self.seq_len)
 
-    def _setup_encoder(self) -> nn.Module:
+    def _setup_model(self) -> nn.Module:
         """
         PatchTST encoder with Graph Correlation Encoder and CAMSA attention..
         """
@@ -82,31 +79,5 @@ class CPatchTSTLightning(AnomalyPredictionModule):
         init_gcn_weights(graph_encoder)
         camsa_patch_tst = CAMSAPatchTST(self.model_config)
         init_transformer_encoder_weights(camsa_patch_tst)
-        return CAMSAModule(graph_encoder, camsa_patch_tst)
-
-    def _setup_classifier(self) -> nn.Module:
-        """
-        Fully Connected Network classifier.
-        """
-        # Initialize activations
-        hidden_activation = get_activation_fn(self.c_hidden_act)
-        output_activation = get_activation_fn(self.c_output_act)
-        dropout = nn.Dropout(p=self.c_dropout)
-        layers = []
-        encoder_output_size = self.pred_len * self.channels
-        for size in self.c_layers_sizes:
-            layers.extend([
-                nn.Linear(encoder_output_size, size),
-                hidden_activation,
-                dropout
-            ])
-            encoder_output_size = size
-
-        layers.extend([
-            nn.Linear(encoder_output_size, self.pred_len * self.channels),
-            output_activation
-        ])
-
-        classifier = nn.Sequential(*layers)
-        init_mlp_classifier_weights(classifier)
-        return classifier
+        output_act = ActivationFunction(self.output_act)
+        return CAMSAModule(graph_encoder, nn.Sequential([camsa_patch_tst, output_act]))

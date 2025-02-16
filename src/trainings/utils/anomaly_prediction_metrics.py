@@ -35,6 +35,7 @@ class ExistenceOfAnomaly(Metric):
         denominator = 2 * self.true_positives + self.false_positives + self.false_negatives + epsilon
         return (numerator / denominator)
 
+
 class DensityOfAnomalies(Metric):
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
@@ -54,6 +55,7 @@ class DensityOfAnomalies(Metric):
     def compute(self) -> float:
         epsilon = 1e-7
         return 1 - (self.cumulative_density / (self.total + epsilon))
+
 
 class LeadTime(Metric):
     def __init__(self, threshold: float = 0.5, **kwargs: Any):
@@ -88,13 +90,14 @@ class LeadTime(Metric):
         # Calculate distances only for valid sequences
         distances = torch.abs(first_pred - first_target)
         distances = distances * valid_sequences  # Zero out invalid sequences
-        
+
         self.cumulative_distance += distances.sum()
         self.valid_sequences += valid_sequences.sum()
 
     def compute(self) -> float:
         epsilon = 1e-7
         return 1 - (self.cumulative_distance / (self.total_length + epsilon))
+
 
 class DiceScore(Metric):
     def __init__(self, threshold: float = 0.5, **kwargs: Any):
@@ -124,3 +127,110 @@ class DiceScore(Metric):
         numerator = 2 * self.common_predicted_positives + epsilon
         denominator = self.pred_positives + self.target_positives + epsilon
         return numerator / denominator
+
+
+class ROCAUC(Metric):
+    """
+    A metric that computes the Area Under the ROC Curve for anomaly detection.
+
+    This implementation:
+    - Accumulates predictions and targets across batches
+    - Computes ROC curve points using multiple thresholds
+    - Calculates AUC using the trapezoidal rule
+    - Handles both binary labels and continuous scores
+    - Supports multi-dimensional inputs by flattening
+
+    Args:
+        num_thresholds (int): Number of thresholds to use for ROC curve (default: 100)
+        compute_on_step (bool): Whether to compute metric on batch level (default: True)
+        dist_sync_on_step (bool): Synchronize metric state across processes (default: False)
+    """
+
+    def __init__(
+            self,
+            num_thresholds: int = 100,
+
+    ):
+        super().__init__(
+        )
+
+        self.num_thresholds = num_thresholds
+
+        # Initialize state for accumulating predictions and targets
+        self.add_state("preds", default=[], dist_reduce_fx=None)
+        self.add_state("target", default=[], dist_reduce_fx=None)
+
+    def update(self, preds: torch.Tensor, target: torch.Tensor) -> None:
+        """
+        Update state with predictions and targets.
+
+        Args:
+            preds: Predicted scores or probabilities (any shape)
+            target: Ground truth binary labels (same shape as preds)
+        """
+        # Flatten inputs to handle multi-dimensional data
+        preds_flat = preds.flatten()
+        target_flat = target.flatten()
+
+        # Accumulate predictions and targets
+        self.preds.append(preds_flat)
+        self.target.append(target_flat)
+
+    def compute(self) -> torch.Tensor:
+        """
+        Compute the ROC-AUC score.
+
+        Returns:
+            torch.Tensor: The computed ROC-AUC score
+        """
+        # Concatenate all accumulated predictions and targets
+        preds = torch.cat(self.preds)
+        target = torch.cat(self.target)
+
+        # Generate thresholds
+        min_score = preds.min()
+        max_score = preds.max()
+        thresholds = torch.linspace(min_score, max_score, self.num_thresholds)
+
+        tpr_list = []
+        fpr_list = []
+
+        # Calculate TPR and FPR for each threshold
+        for threshold in thresholds:
+            pred_labels = (preds >= threshold).float()
+
+            # True Positives and False Positives
+            tp = torch.sum((pred_labels == 1) & (target == 1)).float()
+            fp = torch.sum((pred_labels == 1) & (target == 0)).float()
+
+            # True Negatives and False Negatives
+            tn = torch.sum((pred_labels == 0) & (target == 0)).float()
+            fn = torch.sum((pred_labels == 0) & (target == 1)).float()
+
+            # Calculate rates
+            tpr = tp / (tp + fn) if (tp + fn) > 0 else torch.tensor(0.0)
+            fpr = fp / (fp + tn) if (fp + tn) > 0 else torch.tensor(0.0)
+
+            tpr_list.append(tpr)
+            fpr_list.append(fpr)
+
+        # Convert lists to tensors
+        tpr = torch.tensor(tpr_list)
+        fpr = torch.tensor(fpr_list)
+
+        # Sort by FPR for proper AUC calculation
+        sorted_indices = torch.argsort(fpr)
+        fpr = fpr[sorted_indices]
+        tpr = tpr[sorted_indices]
+
+        # Calculate AUC using trapezoidal rule
+        width = fpr[1:] - fpr[:-1]
+        height = (tpr[1:] + tpr[:-1]) / 2
+        auc = torch.sum(width * height)
+
+        return auc
+
+    def reset(self) -> None:
+        """Reset metric states."""
+        self.preds.clear()
+        self.target.clear()

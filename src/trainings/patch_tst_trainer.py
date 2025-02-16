@@ -204,6 +204,8 @@ class PatchTSTTrainer(ABC):
         """
         pass
 
+    # TODO fix dataset!
+
     def _setup_dataloaders(self) -> tuple[DataLoader, DataLoader]:
         """
         Set up training and validation dataloaders.
@@ -222,7 +224,7 @@ class PatchTSTTrainer(ABC):
             shuffle=False,
             pin_memory=True,
             persistent_workers=True,
-            collate_fn=collate_batch,
+            #collate_fn=collate_batch,
 
         )
 
@@ -233,7 +235,7 @@ class PatchTSTTrainer(ABC):
             shuffle=False,
             pin_memory=True,
             persistent_workers=True,
-            collate_fn=collate_batch,
+            #collate_fn=collate_batch,
         )
 
         return train_loader, val_loader

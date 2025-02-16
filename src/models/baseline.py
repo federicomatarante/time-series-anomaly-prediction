@@ -1,14 +1,15 @@
 from typing import Tuple
 
 from torch import nn
+from torch.nn import Unflatten
 
-from src.models.anomaly_prediction_module import AnomalyPredictionModule
-from src.models.utils import init_mlp_classifier_weights
+from src.models.anomaly_prediction_module import AnomalyDetectionModule
+from src.models.utils import init_mlp_weights, Flatten
 from src.trainings.utils.config_enums_utils import get_activation_fn
 from src.utils.config.config_reader import ConfigReader
 
 
-class AnomalyPredictionBaseline(AnomalyPredictionModule):
+class AnomalyPredictionBaseline(AnomalyDetectionModule):
     """
     Basic Implementation of the AnomalyPredictionModule.
     Encoder: Identity function (no encoding)
@@ -17,6 +18,7 @@ class AnomalyPredictionBaseline(AnomalyPredictionModule):
     :param model_config: Configuration file with model's hyperparameters.
     :param training_config: Configuration file with training's hyperparameters.
     """
+
     def __init__(self, model_config: ConfigReader, training_config: ConfigReader):
         # Encoder
         self.model_config = model_config
@@ -33,23 +35,12 @@ class AnomalyPredictionBaseline(AnomalyPredictionModule):
         self.channels = model_config.get_param('seq.channels', v_type=int)
         super().__init__(training_config, self.channels, self.pred_len, self.window_size)
 
-    def _setup_encoder(self) -> nn.Module:
-        """
-        Identity encoder that passes input through unchanged.
-        """
-        return nn.Identity()
-
-    def _setup_classifier(self) -> nn.Module:
-        """
-        Fully Connected Network classifier that processes the raw input sequence.
-        Takes flattened input of size (window_size * channels) and applies
-        multiple linear layers with dropout and activation functions.
-        """
+    def _setup_model(self) -> nn.Module:
         # Initialize activations
         hidden_activation = get_activation_fn(self.hidden_act)
         output_activation = get_activation_fn(self.output_act)
         dropout = nn.Dropout(p=self.dropout)
-        layers = []
+        layers = [Flatten(-2)]
         input_size = self.window_size * self.channels
         for size in self.layers_size:
             layers.extend([
@@ -64,6 +55,7 @@ class AnomalyPredictionBaseline(AnomalyPredictionModule):
             output_activation
         ])
 
+        layers.append(Unflatten(-1, (self.channels, self.pred_len)))
         classifier = nn.Sequential(*layers)
-        init_mlp_classifier_weights(classifier)
+        init_mlp_weights(classifier)
         return classifier

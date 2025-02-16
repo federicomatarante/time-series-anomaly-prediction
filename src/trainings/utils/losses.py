@@ -111,3 +111,62 @@ class WassersteinLoss(nn.Module):
              print(loss_3d)  # Example output: tensor(0.1123)
         """
         return wasserstein_distance(y_pred, y_true, apply_scaling_factor=self.apply_scaling_factor, weight=self.weight)
+
+
+class HuberLoss(nn.Module):
+    """
+    Huber Loss module for PyTorch neural networks.
+    Combines quadratic and linear loss, making it robust to outliers
+    while maintaining MSE-like behavior for small errors.
+
+    :param delta: Threshold for switching between L1 and L2 loss
+    :param reduction: Specifies reduction method - 'none' for no reduction,
+                     'mean' for mean of losses, 'sum' for sum of losses
+    :raises ValueError: If reduction is not one of ['none', 'mean', 'sum'] or if delta <= 0
+
+
+    :return: Loss value - scalar if reduction='mean'/'sum',
+             or shape (batch_size, *) if reduction='none'
+    :rtype: torch.Tensor
+
+    The loss function transitions smoothly between two regimes:
+    - Quadratic (L2) loss for errors smaller than delta
+    - Linear (L1) loss for errors larger than delta
+    """
+
+    def __init__(self, delta: float = 1.0, reduction: str = 'mean'):
+        super().__init__()
+        self.delta = delta
+        self.reduction = reduction
+
+        if reduction not in ['none', 'mean', 'sum']:
+            raise ValueError(f"Invalid reduction: {reduction}")
+        if delta <= 0:
+            raise ValueError(f"Delta must be positive, got {delta}")
+
+    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
+        """
+        :param y_pred: Predicted values from the model. Tensor of shape [Batch Size, Channels, Timesteps]
+        :param y_true: Ground truth values. Tensor of shape [Batch Size, Channels, Timesteps]
+        :raises ValueError: If shapes of y_pred and y_true don't match.
+        :return: tensor loss. Tensor of shape [1]
+        """
+        if y_pred.shape != y_true.shape:
+            raise ValueError(f"Shape mismatch: y_pred {y_pred.shape} != y_true {y_true.shape}")
+
+        # Calculate error
+        error = y_true - y_pred
+        abs_error = torch.abs(error)
+
+        # quadratic part (MSE-like)
+        quadratic = 0.5 * torch.square(error)
+        # linear part (MAE-like)
+        linear = self.delta * abs_error - 0.5 * self.delta ** 2
+
+        loss = torch.where(abs_error <= self.delta, quadratic, linear)
+
+        if self.reduction == 'mean':
+            return torch.mean(loss)
+        elif self.reduction == 'sum':
+            return torch.sum(loss)
+        return loss

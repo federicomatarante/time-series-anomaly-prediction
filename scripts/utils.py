@@ -5,6 +5,7 @@ from typing import Type
 
 import torch
 
+from src.dataset.anomaly_detection_esa_dataset import AnomalyDetectionESADataset
 from src.dataset.esa import ESADataset
 from src.trainings.patch_tst_trainer import PatchTSTTrainer
 from src.utils.config.ini_config_reader import INIConfigReader
@@ -57,29 +58,24 @@ def train_model(dataset_config_name: str, model_config_name: str, train_config_n
 
     valid_split = dataset_config_name.get_param('dataset.valid_split', v_type=float)
 
-    train_dataset = ESADataset(**dataset_args)
-
-    test_dataset_full = ESADataset(
-        folder=dataset_args['folder'],
-        mission=1,
-        period="84_months",
-        ds_type='test',
-        window_size=dataset_args['window_size'],
-        horizon_size=dataset_args['horizon_size'],
-        stride=5,
+    train_dataset = AnomalyDetectionESADataset(**dataset_args)
+    dataset_args['ds_type'] = 'test'
+    """test_dataset_full = AnomalyDetectionESADataset(
+        **dataset_args,
     )
     dataset_size = len(test_dataset_full)
     valid_size = int(valid_split * dataset_size)
-    test_size = dataset_size - (valid_size)
-
-    test_dataset, valid_dataset = torch.utils.data.random_split(test_dataset_full,
-                                                                               [test_size, valid_size])
+    """ # TODO ??
+    valid_size = int(len(train_dataset) * valid_split)
+    test_size = len(train_dataset) - valid_size
+    test_dataset, valid_dataset = torch.utils.data.random_split(train_dataset,
+                                                                [test_size, valid_size])
     if checkpoint_file_name is not None:
         checkpoint = f"{checkpoint_file_name}.ckpt" if not checkpoint_file_name.endswith(
             ".ckpt") else checkpoint_file_name
     else:
         checkpoint = None
-    
+
     trainer = trainer_class(
         model_config=patch_tst_config,
         training_config=training_config,

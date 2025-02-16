@@ -1,4 +1,4 @@
-__all__ = ['Transpose', 'get_activation_fn', 'moving_avg', 'series_decomp', 'PositionalEncoding', 'SinCosPosEncoding', 'Coord2dPosEncoding', 'Coord1dPosEncoding', 'positional_encoding']           
+__all__ = ['Transpose', 'moving_avg', 'series_decomp', 'PositionalEncoding', 'SinCosPosEncoding', 'Coord2dPosEncoding', 'Coord1dPosEncoding', 'positional_encoding']
 
 import torch
 from torch import nn
@@ -12,13 +12,7 @@ class Transpose(nn.Module):
         if self.contiguous: return x.transpose(*self.dims).contiguous()
         else: return x.transpose(*self.dims)
 
-    
-def get_activation_fn(activation):
-    if callable(activation): return activation()
-    elif activation.lower() == "relu": return nn.ReLU()
-    elif activation.lower() == "gelu": return nn.GELU()
-    raise ValueError(f'{activation} is not available. You can use "relu", "gelu", or a callable') 
-    
+
     
 # decomposition
 

@@ -2,19 +2,21 @@ from abc import abstractmethod, ABC
 from typing import final
 
 import pytorch_lightning as pl
+import torch
 from torch import nn
 from torch.utils.data import Dataset
 
-from src.trainings.utils.anomaly_prediction_metrics import ExistenceOfAnomaly, DensityOfAnomalies, LeadTime, DiceScore
-from src.trainings.utils.losses import WassersteinLoss
+from src.trainings.utils.anomaly_prediction_metrics import ExistenceOfAnomaly, DensityOfAnomalies, LeadTime, DiceScore, \
+    ROCAUC
+from src.trainings.utils.losses import WassersteinLoss, HuberLoss
 from src.trainings.utils.optimizer_factory import OptimizerFactory
 from src.trainings.utils.scheduler_factory import SchedulerFactory
 from src.utils.config.config_reader import ConfigReader
 
 
-class AnomalyPredictionModule(pl.LightningModule, ABC):
+class AnomalyDetectionModule(pl.LightningModule, ABC):
     """
-    A PyTorch Lightning module for anomaly prediction in time series data.
+    A PyTorch Lightning module for anomaly detection in time series data.
 
     This abstract base class implements the core functionality for training, validating,
     and testing models that predict anomalies in multivariate time series. The module
@@ -53,16 +55,15 @@ class AnomalyPredictionModule(pl.LightningModule, ABC):
         self.scheduler_state, self.optimizer_state = None, None
         self.save_hyperparameters()
         # Loss Function
-        loss_scaling_factor = config_reader.get_param('training.loss_scaling_factor', v_type=bool)
-        loss_weight = config_reader.get_param("training.loss_weight", v_type=float, nullable=True)
-        self.loss_fn = WassersteinLoss(apply_scaling_factor=loss_scaling_factor, weight=loss_weight)
+        delta = config_reader.get_param('training.loss_delta', v_type=float)
+        reduction = config_reader.get_param("training.loss_reduction", v_type=str, nullable=True, domain={'mean', 'sum'})
+        self.loss_fn = HuberLoss(delta=delta, reduction=reduction)
         # Scheduler and optimizer parameters
         self.scheduler_config = config_reader.sub_reader({'scheduler', 'scheduler.StepLR'})
         self.optimizer_config = config_reader.sub_reader({'optimizer', 'optimizer.Adam'})
 
         # Model modules
-        self.encoder = self._setup_encoder()
-        self.classifier = self._setup_classifier()
+        self.model = self._setup_model()
 
         # Input/Output parameters
         self.channels = channels
@@ -75,6 +76,7 @@ class AnomalyPredictionModule(pl.LightningModule, ABC):
         self.val_density = DensityOfAnomalies()
         self.val_leadtime = LeadTime(threshold=val_threshold)
         self.val_dice = DiceScore(threshold=val_threshold)
+        self.val_roc_auc = ROCAUC()  # This would use y_hat_scores instead of y_hat
 
         # Test metrics with the configured threshold
         test_threshold = config_reader.get_param('metrics.evaluate_metrics_threshold', v_type=float)
@@ -82,24 +84,15 @@ class AnomalyPredictionModule(pl.LightningModule, ABC):
         self.test_density = DensityOfAnomalies()
         self.test_leadtime = LeadTime(threshold=test_threshold)
         self.test_dice = DiceScore(threshold=test_threshold)
+        self.test_roc_auc = ROCAUC()  # This would use y_hat_scores instead of y_hat
 
     @abstractmethod
-    def _setup_encoder(self) -> nn.Module:
+    def _setup_model(self) -> nn.Module:
         """
-        Returns an encoder of the time series, which accepts the following constraints:
+        Returns a forecaster of the time series, which accepts the following constraints:
             - Input Shape: [batch_size, channels, seq_len]
             - Output Shape: [batch_size, channels, pred_len]
         :return: the encoder of the time series.
-        """
-        pass
-
-    @abstractmethod
-    def _setup_classifier(self) -> nn.Module:
-        """
-        Returns a classifier of the time series, which accepts the following constraints:
-            - Input Shape: [batch_size, channels * pred_len]
-            - Output Shape: [batch_size, channels * pred_len]
-        :return: the classifier of the time series.
         """
         pass
 
@@ -117,11 +110,66 @@ class AnomalyPredictionModule(pl.LightningModule, ABC):
              print(output.shape)  # torch.Size([32, window_size])
         """
         # x: (batch_size, channels, seq_len)
-        x = self.encoder(x)  # (batch_size, channels, pred_len )
-        x = x.flatten(-2, -1)  # (batch_size, channels * pred_len)
-        x = self.classifier(x)  # (batch_size, pred_len * channels)
-        x = x.view(-1, self.channels, self.pred_len, )  # (batch_size, channels, pred_len)
+        x = self.model(x)  # (batch_size, channels, pred_len )
         return x
+
+    def _find_anomalies(self, prediction, actual_values):
+        anomaly_scores = torch.abs(prediction - actual_values)
+
+        # Calculate threshold using mean + std of errors # TODO remove stupid comments
+        # Using reduction=None in mean/std to preserve dimensions for broadcasting
+        threshold = (
+                anomaly_scores.mean(dim=-1, keepdim=True) +
+                2.0 * anomaly_scores.std(dim=-1, keepdim=True)
+        )
+
+        # Create boolean mask for anomalies
+        anomaly_mask = (anomaly_scores > threshold).float()
+        # TODO cimprove or customize?
+        #TODO use anomaly score in metrics instead of mask'
+
+        return anomaly_mask, anomaly_scores  # TODO document and change documentation
+
+    def detect_anomalies(self, starting_window: torch.Tensor, prediction_window: torch.Tensor):
+        """
+        Detects anomalies by comparing the model's predictions with actual values.
+
+        :param starting_window: Input tensor of shape (batch_size, channels, seq_len)
+        :param prediction_window: Ground truth tensor of shape (batch_size, channels, pred_len)
+        :return: Tuple containing (anomaly_scores, anomaly_mask, prediction)
+            - anomaly_scores (torch.Tensor): Raw anomaly scores
+            - anomaly_mask (torch.Tensor): Boolean mask indicating anomalies
+            - prediction (torch.Tensor): Model's predictions
+        :rtype: tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+        """
+
+        if len(starting_window.shape) != len(prediction_window.shape) != 3:
+            raise ValueError(
+                f"starting_window and prediction_window must be 3D (batch_size, channels, seq_len), got shape {starting_window.shape} and {prediction_window.shape}")
+
+        # Check specific dimensions
+        if starting_window.shape[1] != self.channels:
+            raise ValueError(f"starting_window must have {self.channels} channels, got {starting_window.shape[1]}")
+        if starting_window.shape[2] != self.seq_len:
+            raise ValueError(
+                f"starting_window must have sequence length {self.seq_len}, got {starting_window.shape[2]}")
+        if prediction_window.shape[1] != self.channels:
+            raise ValueError(f"prediction_window must have {self.channels} channels, got {prediction_window.shape[1]}")
+        if prediction_window.shape[2] != self.pred_len:
+            raise ValueError(
+                f"prediction_window must have prediction length {self.pred_len}, got {prediction_window.shape[2]}")
+
+        # Ensure batch sizes match
+        if starting_window.shape[0] != prediction_window.shape[0]:
+            raise ValueError(
+                f"Batch sizes must match: starting_window has {starting_window.shape[0]}, prediction_window has {prediction_window.shape[0]}")
+
+        with torch.no_grad():
+            prediction = self(starting_window)  # Shape: (batch_size, channels, pred_len)
+
+        anomaly_mask, anomaly_scores = self._find_anomalies(prediction, prediction_window)
+
+        return anomaly_scores, anomaly_mask, prediction
 
     @final
     def check_compatibility(self, dataset: Dataset):
@@ -133,60 +181,73 @@ class AnomalyPredictionModule(pl.LightningModule, ABC):
         """
         if len(dataset) == 0:
             raise ValueError("Dataset is empty!")
-        signal, output = dataset[0]
-        signal_shape, output_shape = signal.shape, output.shape
-        if len(signal_shape) != 2 or signal_shape[0] != self.channels or signal_shape[1] != self.seq_len:
+        signal_in, signal_out, labels = dataset[0]
+        signal_in_shape, signal_out_shape, labels_shape = signal_in.shape, signal_out.shape, labels.shape
+        if len(signal_in_shape) != 2 or signal_in_shape[0] != self.channels or signal_in_shape[
+            1] != self.seq_len:
             raise ValueError(
-                f"Wrong input shape! Expected: (channels, seq_len) = ({self.channels},{self.seq_len}). Found: ({signal_shape})")
-        if len(output_shape) != 2 or output_shape[0] != self.channels or output_shape[1] != self.pred_len:
+                f"Wrong input shape! Expected: (channels, seq_len) = ({self.channels},{self.seq_len}). Found: ({signal_in_shape})")
+
+        if len(signal_out_shape) != 2 or signal_out_shape[0] != self.channels or signal_out_shape[
+            1] != self.pred_len:
             raise ValueError(
-                f"Wrong output shape! Expected: (channels,pred_len) = ({self.channels},{self.pred_len}). Found: ({output_shape})")
+                f"Wrong input shape! Expected: (channels, pred_len) = ({self.channels},{self.seq_len}). Found: ({signal_out_shape})")
+        if len(labels_shape) != 2 or labels_shape[0] != self.channels or labels_shape[
+            1] != self.pred_len:
+            raise ValueError(
+                f"Wrong input shape! Expected: (channels, pred_len) = ({self.channels},{self.seq_len}). Found: ({labels_shape})")
 
     @final
     def training_step(self, batch, batch_idx):
-        x, y = batch
-        y_hat = self(x)
-        loss = self.loss_fn(y_hat, y)
+        x_in, x_out, _ = batch
+        x_hat = self(x_in)
+        loss = self.loss_fn(x_hat, x_out)
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
         return loss
 
     @final
     def validation_step(self, batch, batch_idx):
-        x, y = batch
-        y_hat = self(x)
-        loss = self.loss_fn(y_hat, y)
+        x_in, x_out, y = batch
+        x_hat = self(x_in)
+        loss = self.loss_fn(x_hat, x_out)
+        y_hat, y_hat_scores = self._find_anomalies(x_hat, x_out)
 
         # Log metrics
         self.val_existence(y_hat, y)
         self.val_density(y_hat, y)
         self.val_leadtime(y_hat, y)
         self.val_dice(y_hat, y)
+        self.val_roc_auc(y_hat_scores, y)
 
         self.log('val_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
         self.log('val_existence', self.val_existence, on_epoch=True)
         self.log('val_density', self.val_density, on_epoch=True)
         self.log('val_leadtime', self.val_leadtime, on_epoch=True)
         self.log('val_dice', self.val_dice, on_epoch=True)
+        self.log('val_roc_auc', self.val_roc_auc, on_epoch=True)
 
         return loss
 
     @final
     def test_step(self, batch, batch_idx):
-        x, y = batch
-        y_hat = self(x)
-        loss = self.loss_fn(y_hat, y)
+        x_in, x_out, y = batch
+        x_hat = self(x_in)
+        loss = self.loss_fn(x_hat, x_out)
+        y_hat, y_hat_scores = self._find_anomalies(x_hat, x_out)
 
         # Use test metrics for testing
         self.test_existence(y_hat, y)
         self.test_density(y_hat, y)
         self.test_leadtime(y_hat, y)
         self.test_dice(y_hat, y)
+        self.test_roc_auc(y_hat_scores, y)
 
         self.log('test_loss', loss, on_epoch=True)
         self.log('test_existence', self.test_existence, on_epoch=True)
         self.log('test_density', self.test_density, on_epoch=True)
         self.log('test_leadtime', self.test_leadtime, on_epoch=True)
         self.log('test_dice', self.test_dice, on_epoch=True)
+        self.log('val_roc_auc', self.test_roc_auc, on_epoch=True)
 
         return loss
 
