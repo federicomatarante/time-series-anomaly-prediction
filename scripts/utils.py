@@ -5,7 +5,6 @@ from typing import Type
 
 import torch
 
-from src.dataset.esa import ESADataset
 from src.dataset.msl import MSLDataset
 from src.trainings.patch_tst_trainer import PatchTSTTrainer
 from src.utils.config.ini_config_reader import INIConfigReader

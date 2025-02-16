@@ -10,6 +10,7 @@ from torch import nn
 
 from src.patchtst.layers.PatchTST_layers import *
 from src.patchtst.layers.RevIN import RevIN
+from src.trainings.utils.config_enums_utils import get_activation_fn
 
 
 # Cell
