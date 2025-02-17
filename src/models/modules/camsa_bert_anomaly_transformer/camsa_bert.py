@@ -82,6 +82,7 @@ def get_camsa_anomaly_prediction_bert(
     linear_embedding = nn.Linear(input_channels * patch_size, d_embed)
 
     transformer_encoder = get_camsa_transformer_encoder(
+        max_seq_len_c=input_channels,
         d_embed=d_embed,
         positional_encoding=positional_encoding,
         relative_position_embedding=relative_position_embedding,
