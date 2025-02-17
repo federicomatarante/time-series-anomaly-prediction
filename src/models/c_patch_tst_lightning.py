@@ -1,35 +1,12 @@
 from torch import nn, Tensor
 
 from src.models.anomaly_prediction_module import AnomalyPredictionModule
+from src.models.modules.camsa_module import CAMSAModule
 from src.models.modules.camsa_patch_tst import CAMSAPatchTST
 from src.models.modules.graph_encoder import GraphCorrelationEncoder
 from src.models.utils import init_transformer_encoder_weights, init_mlp_classifier_weights, init_gcn_weights
 from src.trainings.utils.config_enums_utils import get_activation_fn
 from src.utils.config.config_reader import ConfigReader
-
-
-class CAMSAModule(nn.Module):
-    """
-    Class combining the graph encoder and CAMSAPatchTST in a single module.
-
-    :param graph_encoder: graph encoder to use in the module.
-    :param camsa_patch_tst: path tst to use in the module.
-    """
-    def __init__(self, graph_encoder: GraphCorrelationEncoder, camsa_patch_tst: CAMSAPatchTST):
-        super().__init__()
-        self.graph_encoder = graph_encoder
-        self.camsa_patch_tst = camsa_patch_tst
-
-    def forward(self, x: Tensor) -> Tensor:
-        """
-        :param x: tensor of shape: # [batch_size, channels, seq_len]
-        :return: tensor of [batch_size, channels, pred_len]
-        """
-        c = self.graph_encoder(x)  # [batch_size, channels, correlation_features]
-        x = x.transpose(1, 2)  # [batch_size, seq_len, channels]
-        y = self.camsa_patch_tst(x, c)  # [batch_size, pred_len, channels]
-        y = y.transpose(1, 2)  # [batch_size, channels, pred_len]
-        return y
 
 
 class CPatchTSTLightning(AnomalyPredictionModule):

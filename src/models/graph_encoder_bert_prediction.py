@@ -2,10 +2,11 @@ from torch import nn
 
 from src.models.anomaly_prediction_module import AnomalyPredictionModule
 from src.models.modules.bert_anomaly_transformer.anomaly_prediction_transformer import get_anomaly_prediction_bert
+from src.models.modules.graph_encoder import GraphCorrelationEncoder
 from src.utils.config.config_reader import ConfigReader
 
 
-class AnomalyPredictionBertLightning(AnomalyPredictionModule):
+class GraphEncoderAnomalyPredictionBertLightning(AnomalyPredictionModule):
     """
     Base Implementation of the AnomalyPredictionBert.
     :param model_config: Configuration file with model's hyperparameters.
@@ -24,7 +25,7 @@ class AnomalyPredictionBertLightning(AnomalyPredictionModule):
         # Next, get the core model dimension parameters
         # These control the transformer's embedding space and positional encoding
         self.d_embed = model_config.get_param('embedding.d_embed', v_type=int)
-        self.positional_encoding = model_config.get_param('embedding.positional_encoding', v_type=str,nullable=True)
+        self.positional_encoding = model_config.get_param('embedding.positional_encoding', v_type=str, nullable=True)
         self.relative_position_embedding = model_config.get_param('embedding.relative_position_embedding',
                                                                   v_type=bool)
 
@@ -36,13 +37,23 @@ class AnomalyPredictionBertLightning(AnomalyPredictionModule):
 
         # Finally, get training-related parameters
         self.dropout = model_config.get_param('training.dropout', v_type=float)
+
+        # Graph Information
+        self.graph_hidden_layers = model_config.get_collection("graph.hidden_layers", v_type=int, collection_type=list)
         super().__init__(training_config, self.channels, self.pred_len, self.seq_len)
 
     def _setup_encoder(self) -> nn.Module:
         """
         PatchTST standard encoder.
         """
-        return get_anomaly_prediction_bert(
+        graph_encoder = GraphCorrelationEncoder(
+            num_nodes=self.channels,
+            dropout=self.dropout,
+            input_features=self.seq_len,
+            embedding_size=self.seq_len,
+            hidden_layers_sizes=self.graph_hidden_layers
+        )
+        model = get_anomaly_prediction_bert(
             input_channels=self.channels,
             output_channels=self.channels,
             patch_size=self.patch_size,
@@ -57,7 +68,7 @@ class AnomalyPredictionBertLightning(AnomalyPredictionModule):
             dropout=self.dropout,
             causal_mask=self.causal_mask
         )
-
+        return nn.Sequential(graph_encoder,model)
     def _setup_classifier(self) -> nn.Module:
         """
         Fully Connected Network classifier.
