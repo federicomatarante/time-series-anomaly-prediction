@@ -21,7 +21,7 @@ def get_args():
 
 
 def train_model(dataset_config_name: str, model_config_name: str, train_config_name: str, logs_path: str,
-                trainer_class: Type[PatchTSTTrainer], checkpoint_file_name: str = None):
+                trainer_class: Type[PatchTSTTrainer], checkpoint_file_name: str = None, configs_dir = None):
     """
     Trains a model using the specified configuration files and trainer class.
 
@@ -39,7 +39,8 @@ def train_model(dataset_config_name: str, model_config_name: str, train_config_n
 
     logs_dir = base_dir / Path(logs_path)
     os.makedirs(logs_dir, exist_ok=True)
-    configs_dir = base_dir / Path('configs')
+    if not configs_dir:
+        configs_dir = base_dir / Path('configs')
 
     dataset_config_name = INIConfigReader(configs_dir / dataset_config_name, base_path=base_dir)
     patch_tst_config = INIConfigReader(configs_dir / model_config_name, base_path=logs_dir)
@@ -82,4 +83,4 @@ def train_model(dataset_config_name: str, model_config_name: str, train_config_n
     )
     trainer.train()
     torch.use_deterministic_algorithms(False)  # I get an error if True (default)
-    trainer.evaluate(test_dataset=test_dataset)
+    return trainer.evaluate(test_dataset=test_dataset)
