@@ -7,8 +7,8 @@ if __name__ == '__main__':
     train_model(
         dataset_config_name='dataset.ini',
         model_config_name='patchtst.ini',
-        train_config_name='training.ini',
-        logs_path='logs/patch_tst_training',
+        train_config_name='patchtst_training.ini',
+        logs_path='logs/patch_tst_trainings',
         trainer_class=BasePatchTSTTrainer,
         checkpoint_file_name=ckpt_name,
     )

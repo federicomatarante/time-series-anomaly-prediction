@@ -9,9 +9,12 @@ from src.utils.config.config_reader import ConfigReader
 
 class GraphAnomalyPrediction(AnomalyPredictionModule):
     """
-    Base Implementation of the AnomalyPredictionModule.
-    Encoder: Base PatchTST
-    Classifier: Fully Connected Layer
+    Graph used for anomaly prediction. Key features are
+        - A Graph is created in which each node is a channel, so the input is (channels,seq_len)
+        - An learnable adjacency matrix is used
+        - A series of graph convolutional layers are used
+        - A final projector creates an embedding matrix C (channels, c_embed_size) which contains information about channels correlation
+        - A MLP classifier is used to do final classifications of the future time steps
     :param model_config: Configuration file with model's hyperparameters.
     :param training_config: Configuration file with training's hyperparameters.
     """

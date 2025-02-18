@@ -11,6 +11,7 @@ from src.utils.config.config_reader import ConfigReader
 class AnomalyPredictionBaseline(AnomalyPredictionModule):
     """
     Basic Implementation of the AnomalyPredictionModule.
+    A simple fully connected network.
     Encoder: Identity function (no encoding)
     Classifier: Fully Connected Network
 

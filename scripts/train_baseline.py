@@ -6,7 +6,7 @@ if __name__ == '__main__':
     train_model(
         dataset_config_name='dataset.ini',
         model_config_name='baseline.ini',
-        train_config_name='training.ini',
-        logs_path='logs/baseline_training',
+        train_config_name='baseline_training.ini',
+        logs_path='logs/baseline_trainings',
         trainer_class=BaselineTrainer,
     )

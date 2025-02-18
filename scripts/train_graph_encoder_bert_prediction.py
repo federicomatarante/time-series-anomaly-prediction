@@ -4,8 +4,8 @@ from src.trainings.graph_encoder_bert_prediction_trainer import GraphEncoderBert
 if __name__ == '__main__':
     train_model(
         dataset_config_name='dataset.ini',
-        model_config_name='gebart.ini',
-        train_config_name='btraining.ini',
-        logs_path='logs/camsa_bart_trainings',
+        model_config_name='graph_encoder_bart.ini',
+        train_config_name='graph_encoder_training.ini',
+        logs_path='logs/graph_encoder_bert_training',
         trainer_class=GraphEncoderBertAnomalyPredictionTrainer
     )

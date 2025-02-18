@@ -1,4 +1,3 @@
-import numpy as np
 from torch import nn, Tensor
 from torch_geometric.nn import GCNConv
 

@@ -2,7 +2,7 @@ from typing import Optional
 
 from torch import nn, Tensor
 
-from src.models.modules.camsa import CAMSA
+from src.models.modules.c_patcht_tst.camsa import CAMSA
 from src.patchtst.layers.PatchTST_layers import Transpose
 from src.trainings.utils.config_enums_utils import get_activation_fn
 

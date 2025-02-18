@@ -7,7 +7,11 @@ from src.utils.config.config_reader import ConfigReader
 
 class AnomalyPredictionBertLightning(AnomalyPredictionModule):
     """
-    Base Implementation of the AnomalyPredictionBert.
+    The following key features are:
+        - Input (channels, seq_len) is divided into patches and reshaped in (num_patches, channels * patch_size )
+        - The patches are projected in a new embedding space (num_patches, embed_dim)
+        - The patches are processed in a transformer encoder
+        - The output is processed by a MLP and classified with a classification layer
     :param model_config: Configuration file with model's hyperparameters.
     :param training_config: Configuration file with training's hyperparameters.
     """

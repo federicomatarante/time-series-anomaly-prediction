@@ -31,18 +31,18 @@ class AnomalyPredictionBert(nn.Module):
             x: (n_batch,  d_data,n_token) = (_, max_seq_len*patch_size, _)
         """
         n_batch = x.shape[0]
-        x = x.transpose(-1, -2) # B,C,S
+        x = x.transpose(-1, -2)  # B,C,S
 
         # Embedding dell'input come prima
         embedded_out = x.contiguous().view(n_batch, self.max_seq_len, self.patch_size, -1).view(n_batch,
                                                                                                 self.max_seq_len, -1)
+        # x: [batch_size,  num_patches, channels * patch_size]
         embedded_out = self.linear_embedding(embedded_out)
+        # x: [batch_size,  num_patches, d_embed]
 
-        # Elaborazione del transformer per ottenere l'embedding ricco di features
-        transformer_out = self.transformer_encoder(embedded_out)  # (n_batch, max_seq_len, d_embed)
+        transformer_out = self.transformer_encoder(embedded_out)  # (n_batch, num_patches, d_embed)
 
-        # Flatten dell'embedding per catturare tutte le informazioni
-        full_context = transformer_out.reshape(n_batch, -1)  # (n_batch, max_seq_len * d_embed)
+        full_context = transformer_out.reshape(n_batch, -1)  # (n_batch, num_patches * d_embed)
 
         # Proiezione nell'output di lunghezza desiderata
         output = self.output_projection(full_context)  # (n_batch, target_len * output_d_data)
@@ -103,7 +103,6 @@ def get_anomaly_prediction_bert(
         if isinstance(layer, nn.Linear):
             nn.init.xavier_uniform_(layer.weight)
             nn.init.zeros_(layer.bias)
-
 
     return AnomalyPredictionBert(
         linear_embedding,

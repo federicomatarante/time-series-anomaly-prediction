@@ -14,10 +14,6 @@ class AnomalyPredictionBert(nn.Module):
                  d_embed, patch_size,
                  max_seq_len,
                  target_len):
-        """
-        Args come prima, ma ora output_projection è progettato per generare sequenze
-        di lunghezza variabile a partire dall'embedding completo
-        """
         super(AnomalyPredictionBert, self).__init__()
         self.linear_embedding = linear_embedding
         self.transformer_encoder = transformer_encoder
@@ -40,22 +36,19 @@ class AnomalyPredictionBert(nn.Module):
         c = c.view(n_batch, -1, self.d_embed)  # [B,C, d]
         x = x.transpose(-1, -2)  # [B, S, C]
 
-        # Embedding dell'input come prima
         embedded_out = (x.contiguous().view(n_batch, self.max_seq_len, self.patch_size, -1).
                         view(n_batch, self.max_seq_len, -1))  # (n_batch,  max_seq_len, num_patches * channels)
         embedded_out = self.linear_embedding(embedded_out)  # (n_batch, max_seq_len, d_embed)
-        # Elaborazione del transformer per ottenere l'embedding ricco di features
         transformer_out = self.transformer_encoder(embedded_out, c)  # (n_batch, max_seq_len, d_embed)
 
-        # Flatten dell'embedding per catturare tutte le informazioni
         full_context = transformer_out.reshape(n_batch, -1)  # (n_batch, max_seq_len * d_embed)
 
-        # Proiezione nell'output di lunghezza desiderata
         output = self.output_projection(full_context)  # (n_batch, target_len * output_d_data)
         output = output.view(n_batch, self.target_len, -1)  # (n_batch, target_len, output_d_data)
         output = output.transpose(-1, -2)
 
         return output
+
 
 def get_camsa_anomaly_prediction_bert(
         input_channels,
@@ -73,10 +66,6 @@ def get_camsa_anomaly_prediction_bert(
         dropout=0.1,
         causal_mask=False,
 ):
-    """
-    Versione modificata che può generare output di lunghezza variabile
-    utilizzando l'intero contesto dell'input
-    """
     hidden_dim = int(hidden_dim_rate * d_embed)
     num_patches = input_length // patch_size
     linear_embedding = nn.Linear(input_channels * patch_size, d_embed)
@@ -94,7 +83,6 @@ def get_camsa_anomaly_prediction_bert(
         causal_mask=causal_mask
     )
 
-    # Output projection che prende l'intero contesto e genera una sequenza
     output_projection = nn.Sequential(
         nn.Linear(num_patches * d_embed, hidden_dim),
         nn.GELU(),
@@ -104,14 +92,12 @@ def get_camsa_anomaly_prediction_bert(
         nn.Sigmoid()
     )
 
-    # Inizializzazione dei pesi
     nn.init.xavier_uniform_(linear_embedding.weight)
     nn.init.zeros_(linear_embedding.bias)
     for layer in output_projection:
         if isinstance(layer, nn.Linear):
             nn.init.xavier_uniform_(layer.weight)
             nn.init.zeros_(layer.bias)
-
 
     return AnomalyPredictionBert(
         linear_embedding,

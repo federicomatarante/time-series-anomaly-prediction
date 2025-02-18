@@ -8,7 +8,18 @@ from src.utils.config.config_reader import ConfigReader
 
 class GraphEncoderAnomalyPredictionBertLightning(AnomalyPredictionModule):
     """
-    Base Implementation of the AnomalyPredictionBert.
+    Bert module with graph encoder. It's composed by a bert module and a GNN module.
+    The GNN module is the following:
+        - A Graph is created in which each node is a channel, so the input is (channels,seq_len)
+        - An learnable adjacency matrix is used
+        - A series of graph convolutional layers are used
+        - A final projector creates an embedding matrix C (channels, c_embed_size) which contains information about channels correlation
+    The following key features of the bert are:
+        - The embedding matrix C (channels, c_embed_size) is divided into patches and reshaped in (num_patches, channels * patch_size )
+        - The patches are projected in a new embedding space (num_patches, embed_dim)
+        - The patches are processed in a transformer encoder
+        - In the transformer encoder it's used cross attention between the patches and the channels embeddings C by the graph.
+        - The output is processed by a MLP and classified with a classification layer
     :param model_config: Configuration file with model's hyperparameters.
     :param training_config: Configuration file with training's hyperparameters.
     """
@@ -68,7 +79,8 @@ class GraphEncoderAnomalyPredictionBertLightning(AnomalyPredictionModule):
             dropout=self.dropout,
             causal_mask=self.causal_mask
         )
-        return nn.Sequential(graph_encoder,model)
+        return nn.Sequential(graph_encoder, model)
+
     def _setup_classifier(self) -> nn.Module:
         """
         Fully Connected Network classifier.

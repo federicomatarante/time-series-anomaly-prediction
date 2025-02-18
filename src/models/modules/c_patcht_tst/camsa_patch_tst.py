@@ -1,10 +1,8 @@
-import torch
 from torch import nn, Tensor
 
-from src.models.modules.camsa_tst_backbone import CAMSATSTBackbone
+from src.models.modules.c_patcht_tst.camsa_tst_backbone import CAMSATSTBackbone
 from src.patchtst.layers.PatchTST_layers import series_decomp
 from src.utils.config.config_reader import ConfigReader
-from src.utils.config.ini_config_reader import INIConfigReader
 
 
 class CAMSAPatchTST(nn.Module):

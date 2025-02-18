@@ -1,8 +1,8 @@
-from torch import nn, Tensor
+from torch import nn
 
 from src.models.anomaly_prediction_module import AnomalyPredictionModule
-from src.models.modules.camsa_module import CAMSAModule
-from src.models.modules.camsa_patch_tst import CAMSAPatchTST
+from src.models.modules.c_patcht_tst.camsa_module import CAMSAModule
+from src.models.modules.c_patcht_tst.camsa_patch_tst import CAMSAPatchTST
 from src.models.modules.graph_encoder import GraphCorrelationEncoder
 from src.models.utils import init_transformer_encoder_weights, init_mlp_classifier_weights, init_gcn_weights
 from src.trainings.utils.config_enums_utils import get_activation_fn

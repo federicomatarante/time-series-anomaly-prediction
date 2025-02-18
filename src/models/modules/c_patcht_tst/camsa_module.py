@@ -1,6 +1,5 @@
 from torch import Tensor, nn
 
-from src.models.modules.camsa_patch_tst import CAMSAPatchTST
 from src.models.modules.graph_encoder import GraphCorrelationEncoder
 
 

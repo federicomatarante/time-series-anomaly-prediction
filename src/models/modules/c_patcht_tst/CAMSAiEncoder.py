@@ -1,7 +1,7 @@
 import torch
 from torch import Tensor, nn
 
-from src.models.modules.camsa_encoder import CAMSAEncoder
+from src.models.modules.c_patcht_tst.camsa_encoder import CAMSAEncoder
 from src.patchtst.layers.PatchTST_layers import positional_encoding
 
 
