@@ -1,6 +1,5 @@
 from pathlib import Path
 from scripts.utils import train_model
-from src.trainings.bert_prediction_trainer import BertAnomalyPredictionTrainer
 import os
 import pickle
 

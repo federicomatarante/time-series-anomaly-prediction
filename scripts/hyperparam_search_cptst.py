@@ -1,11 +1,7 @@
 from pathlib import Path
 from scripts.utils import train_model
-from src.trainings.bert_prediction_trainer import BertAnomalyPredictionTrainer
 import os
-import pickle
-
-from src.trainings.base_patchtst_trainer import BasePatchTSTTrainer
-from ..src.trainings.c_patch_tst_trainer import CPatchTSTTrainer
+from src.trainings.c_patch_tst_trainer import CPatchTSTTrainer
 
 if __name__ == '__main__':
     metrics_list  = []
