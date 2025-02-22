@@ -71,10 +71,6 @@ class AnomalyPredictionModule(pl.LightningModule, ABC):
 
         # Validation metrics with configured threshold
         val_threshold = config_reader.get_param('metrics.val_metrics_threshold', v_type=float)
-        self.val_existence = ExistenceOfAnomaly(threshold=val_threshold)
-        self.val_density = DensityOfAnomalies()
-        self.val_leadtime = LeadTime(threshold=val_threshold)
-        self.val_dice = DiceScore(threshold=val_threshold)
 
         # Test metrics with the configured threshold
         test_threshold = config_reader.get_param('metrics.evaluate_metrics_threshold', v_type=float)
@@ -157,16 +153,16 @@ class AnomalyPredictionModule(pl.LightningModule, ABC):
         loss = self.loss_fn(y_hat, y)
 
         # Log metrics
-        self.val_existence(y_hat, y)
-        self.val_density(y_hat, y)
-        self.val_leadtime(y_hat, y)
-        self.val_dice(y_hat, y)
+        # self.val_existence(y_hat, y)
+        # self.val_density(y_hat, y)
+        # self.val_leadtime(y_hat, y)
+        # self.val_dice(y_hat, y)
 
         self.log('val_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
-        self.log('val_existence', self.val_existence, on_epoch=True)
-        self.log('val_density', self.val_density, on_epoch=True)
-        self.log('val_leadtime', self.val_leadtime, on_epoch=True)
-        self.log('val_dice', self.val_dice, on_epoch=True)
+        # self.log('val_existence', self.val_existence, on_epoch=True)
+        # self.log('val_density', self.val_density, on_epoch=True)
+        # self.log('val_leadtime', self.val_leadtime, on_epoch=True)
+        # self.log('val_dice', self.val_dice, on_epoch=True)
 
         return loss
 

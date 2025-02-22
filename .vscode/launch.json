@@ -24,8 +24,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
             },
-            "program": "scripts/train_patch_tst.py",
-            "args": ["--experiment", "tmp-mock-train"],
+            "program": "scripts/hyperparam_search_bert.py",
             "console": "integratedTerminal",
         }
     ]

@@ -4,25 +4,27 @@ from src.trainings.bert_prediction_trainer import BertAnomalyPredictionTrainer
 import os
 import pickle
 
+from src.trainings.base_patchtst_trainer import BasePatchTSTTrainer
+
 if __name__ == '__main__':
     metrics_list  = []
-    config_folder = Path('./hyperparams-search')
+    config_folder = Path('./hyperparams-search-ptst')
     configs = os.listdir(config_folder)
-    bert_configs = list( filter (lambda x: x.startswith('bart'), configs))
-    for x in bert_configs:
+    configs = list( filter (lambda x: x.startswith('patchtst'), configs))
+    for x in configs:
         res = dict()
         res['metrics'] = train_model(
             dataset_config_name='dataset.ini',
             model_config_name=x,
-            train_config_name='btraining.ini',
-            logs_path='logs/bert_prediction',
+            train_config_name='training.ini',
+            logs_path='logs/patchtst_training',
             configs_dir=config_folder,
-            trainer_class=BertAnomalyPredictionTrainer
+            trainer_class=BasePatchTSTTrainer
         )
         res['config'] = {
             'model': x,
             'dataset': 'dataset.ini',
-            'training': 'btraining.ini'
+            'training': 'training.ini'
         }
         metrics_list.append(res)
         
@@ -30,8 +32,7 @@ if __name__ == '__main__':
     # pickle.dump(metrics_list, fl)
     # fl.close()
 
-    fl = open('bert_comparison.csv', 'w')
-    fl.write(f"model,test_loss,test_existence,test_density,test_leadtime,test_dice\n")
+    fl = open('ptst_comparison.csv', 'w')
     for x in metrics_list:
         fl.write(f"{x['config']['model']},{x['metrics']['test_loss']},{x['metrics']['test_existence']},{x['metrics']['test_density']},{x['metrics']['test_leadtime']},{x['metrics']['test_dice']}\n")
     fl.close()
