@@ -5,10 +5,11 @@ import os
 import pickle
 
 from src.trainings.base_patchtst_trainer import BasePatchTSTTrainer
+from ..src.trainings.c_patch_tst_trainer import CPatchTSTTrainer
 
 if __name__ == '__main__':
     metrics_list  = []
-    config_folder = Path('./hyperparams-search-ptst')
+    config_folder = Path('./hyperparams-search-cptst')
     configs = os.listdir(config_folder)
     configs = list( filter (lambda x: x.startswith('patchtst'), configs))
     for x in configs:
@@ -19,7 +20,7 @@ if __name__ == '__main__':
             train_config_name='training.ini',
             logs_path='logs/patchtst_training',
             configs_dir=config_folder,
-            trainer_class=BasePatchTSTTrainer
+            trainer_class=CPatchTSTTrainer
         )
         res['config'] = {
             'model': x,
