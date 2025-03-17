@@ -51,7 +51,7 @@ class WeightedGCNLayer(nn.Module):
         deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
 
         # Symmetric normalization
-        norm_adj = adj * deg_inv_sqrt.unsqueeze(0) * deg_inv_sqrt.unsqueeze(1)
+        norm_adj = torch.diag(deg_inv_sqrt) @ adj @ torch.diag(deg_inv_sqrt)
 
         # Linear transformation of node features
         support = torch.matmul(x, self.weight)
@@ -82,7 +82,10 @@ class GraphCorrelationEncoder(nn.Module):
         hidden_layers_sizes = hidden_layers_sizes
 
         # Layers
-        self.adj = torch.nn.Parameter(torch.rand(self.num_nodes, self.num_nodes))
+
+        # Initializing adjacency matrix closer to identity
+        self.adj = torch.nn.Parameter(torch.eye(self.num_nodes) + 0.01 * torch.rand(self.num_nodes, self.num_nodes))
+
         self.adj_dropout = nn.Dropout(dropout)
         prev_size = input_features
         self.hidden_layers = nn.ModuleList()

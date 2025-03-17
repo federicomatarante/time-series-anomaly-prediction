@@ -33,6 +33,7 @@ class AnomalyPredictionModule(pl.LightningModule, ABC):
     :param channels (int): Number of input/output channels in the time series
     :param pred_len (int): Length of the prediction window
     :param seq_len (int): Length of the input sequence
+    :param flatten (bool): whether to flatten the output before the classifier.
 
 
     Note:
@@ -48,10 +49,11 @@ class AnomalyPredictionModule(pl.LightningModule, ABC):
         - Output: (batch_size, channels, pred_len)
     """
 
-    def __init__(self, config_reader: ConfigReader, channels: int, pred_len: int, seq_len: int):
+    def __init__(self, config_reader: ConfigReader, channels: int, pred_len: int, seq_len: int, flatten: bool = True):
         super().__init__()
         self.scheduler_state, self.optimizer_state = None, None
         self.save_hyperparameters()
+        self.flatten = flatten
         # Loss Function
         loss_scaling_factor = config_reader.get_param('training.loss_scaling_factor', v_type=bool)
         loss_weight = config_reader.get_param("training.loss_weight", v_type=float, nullable=True)
@@ -71,10 +73,6 @@ class AnomalyPredictionModule(pl.LightningModule, ABC):
 
         # Validation metrics with configured threshold
         val_threshold = config_reader.get_param('metrics.val_metrics_threshold', v_type=float)
-        self.val_existence = ExistenceOfAnomaly(threshold=val_threshold)
-        self.val_density = DensityOfAnomalies()
-        self.val_leadtime = LeadTime(threshold=val_threshold)
-        self.val_dice = DiceScore(threshold=val_threshold)
 
         # Test metrics with the configured threshold
         test_threshold = config_reader.get_param('metrics.evaluate_metrics_threshold', v_type=float)
@@ -118,7 +116,8 @@ class AnomalyPredictionModule(pl.LightningModule, ABC):
         """
         # x: (batch_size, channels, seq_len)
         x = self.encoder(x)  # (batch_size, channels, pred_len )
-        x = x.flatten(-2, -1)  # (batch_size, channels * pred_len)
+        if self.flatten:
+            x = x.flatten(-2, -1)  # (batch_size, channels * pred_len)
         x = self.classifier(x)  # (batch_size, pred_len * channels)
         x = x.view(-1, self.channels, self.pred_len, )  # (batch_size, channels, pred_len)
         return x
@@ -157,16 +156,16 @@ class AnomalyPredictionModule(pl.LightningModule, ABC):
         loss = self.loss_fn(y_hat, y)
 
         # Log metrics
-        self.val_existence(y_hat, y)
-        self.val_density(y_hat, y)
-        self.val_leadtime(y_hat, y)
-        self.val_dice(y_hat, y)
+        # self.val_existence(y_hat, y)
+        # self.val_density(y_hat, y)
+        # self.val_leadtime(y_hat, y)
+        # self.val_dice(y_hat, y)
 
         self.log('val_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
-        self.log('val_existence', self.val_existence, on_epoch=True)
-        self.log('val_density', self.val_density, on_epoch=True)
-        self.log('val_leadtime', self.val_leadtime, on_epoch=True)
-        self.log('val_dice', self.val_dice, on_epoch=True)
+        # self.log('val_existence', self.val_existence, on_epoch=True)
+        # self.log('val_density', self.val_density, on_epoch=True)
+        # self.log('val_leadtime', self.val_leadtime, on_epoch=True)
+        # self.log('val_dice', self.val_dice, on_epoch=True)
 
         return loss
 

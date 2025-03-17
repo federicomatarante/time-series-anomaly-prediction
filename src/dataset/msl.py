@@ -1,6 +1,7 @@
 import ast
+import random
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Tuple, List
 
 import numpy as np
 import pandas as pd
@@ -52,8 +53,7 @@ def get_labeled_anomalies(dataset_name: str, dataset_type: str):
 class MSLDataset(Dataset):
     """PyTorch Dataset for NASA's MSL spacecraft telemetry data.
 
-    This dataset processes telemetry data for anomaly detection by creating sliding windows
-    of input sequences and their corresponding anomaly labels.
+
 
     :param ds_type: dataset type to load. Must be in ['train', 'test']
     :param window_size: size of the input sequence window
@@ -73,7 +73,7 @@ class MSLDataset(Dataset):
         self.horizon_size = horizon_size
         self.stride = stride
         anomalies = get_labeled_anomalies("MSL", ds_type)
-        self._load_dataset(anomalies)
+        self.dataset = self._load_dataset(anomalies)
 
     def _load_dataset(self, anomalies: dict[Path, dict[str, Any]]):
         """Load and process the raw data into sliding windows.
@@ -86,7 +86,7 @@ class MSLDataset(Dataset):
          1. Loads raw numpy arrays and converts to tensors
          2. Creates binary anomaly tensors from metadata
          3. Segments data into overlapping windows using stride
-         4. Creates (sequence, anomaly) pairs for each window
+         4. Creates (in_window, out_window) pairs for each window
 
          Shapes:
              - sequence_tensor: [seq_len, channels] - Raw input sequence
@@ -94,38 +94,7 @@ class MSLDataset(Dataset):
              - sequence_piece: [window_size, channels] - Input window
              - anomaly_piece: [horizon_size, channels] - Target window
          """
-        data = []
-        # Parsed data and converted to tensors
-        for file, meta in anomalies.items():
-            sequence = np.load(file)
-            num_values = meta['num_values']
-            sequence_tensor = torch.from_numpy(sequence)  # Shape [seq_len, channels]
-            anomalies_tensor = torch.zeros_like(sequence_tensor)  # Creating anomaly tensor
-            anomalies = meta['sequences']  # List of [start_anomaly,end_anomaly] indexes
-            for anomaly in anomalies:
-                start_anomaly, end_anomaly = anomaly[0], anomaly[1]
-                anomalies_tensor[start_anomaly: end_anomaly] = 1
-            data.append((num_values, sequence_tensor, anomalies_tensor))
-
-        # Divide it in pieces
-        dataset = []
-        for num_values, sequence_tensor, anomalies_tensor in data:
-            num_pieces = (sequence_tensor.shape[
-                              0] - self.window_size - self.horizon_size) // self.stride + 1  # Fixed calculation
-            for i in range(num_pieces):
-                seq_start = i * self.stride
-                seq_end = seq_start + self.window_size
-                pred_end = seq_end + self.horizon_size
-
-                # Check if pred_end index is past sequence length
-                if pred_end > num_values:
-                    break
-                # Cut and also converted to shape (channels, seq_len)
-                sequence_piece = sequence_tensor[seq_start:seq_end, :].transpose(0, 1).float()
-                anomaly_piece = anomalies_tensor[seq_end:pred_end, :].transpose(0, 1).float()
-
-                dataset.append((sequence_piece, anomaly_piece))
-        self.dataset = dataset
+        raise NotImplementedError()
 
     def __len__(self):
         """Return the total number of windows in the dataset.

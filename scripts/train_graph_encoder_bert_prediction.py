@@ -5,7 +5,7 @@ if __name__ == '__main__':
     train_model(
         dataset_config_name='dataset.ini',
         model_config_name='graph_encoder_bart.ini',
-        train_config_name='graph_encoder_training.ini',
-        logs_path='logs/graph_encoder_bert_training',
+        train_config_name='graph_enc\oder_bart_training.ini',
+        logs_path='logs/graph_encoder_bart_training',
         trainer_class=GraphEncoderBertAnomalyPredictionTrainer
     )

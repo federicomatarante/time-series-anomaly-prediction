@@ -2,6 +2,9 @@ import copy
 import os
 import sys
 
+from src.models.modules.bert_anomaly_transformer.transformer_encoder import PositionWiseFeedForwardLayer, \
+    AbsolutePositionEmbedding, SinusoidalPositionalEncoding
+
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
 import numpy as np

@@ -5,6 +5,32 @@ from src.models.modules.bert_anomaly_transformer.anomaly_prediction_transformer 
 from src.utils.config.config_reader import ConfigReader
 
 
+class OutputProjection(nn.Module):
+    def __init__(self, num_patches, d_embed, hidden_dim, pred_len, channels):
+        super(OutputProjection, self).__init__()
+        self.pred_len = pred_len
+        self.channels = channels
+
+        self.output_projection = nn.Sequential(
+            nn.Linear(num_patches * d_embed, hidden_dim),
+            nn.GELU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.GELU(),
+            nn.Linear(hidden_dim, pred_len * channels),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        # Apply output_projection
+        output = self.output_projection(x)
+
+        # Reshape and transpose
+        n_batch = x.shape[0]
+        output = output.view(n_batch, self.pred_len, -1)  # (n_batch, pred_len, output_d_data)
+
+        return output
+
+
 class AnomalyPredictionBertLightning(AnomalyPredictionModule):
     """
     The following key features are:
@@ -28,7 +54,7 @@ class AnomalyPredictionBertLightning(AnomalyPredictionModule):
         # Next, get the core model dimension parameters
         # These control the transformer's embedding space and positional encoding
         self.d_embed = model_config.get_param('embedding.d_embed', v_type=int)
-        self.positional_encoding = model_config.get_param('embedding.positional_encoding', v_type=str,nullable=True)
+        self.positional_encoding = model_config.get_param('embedding.positional_encoding', v_type=str, nullable=True)
         self.relative_position_embedding = model_config.get_param('embedding.relative_position_embedding',
                                                                   v_type=bool)
 
@@ -40,7 +66,7 @@ class AnomalyPredictionBertLightning(AnomalyPredictionModule):
 
         # Finally, get training-related parameters
         self.dropout = model_config.get_param('training.dropout', v_type=float)
-        super().__init__(training_config, self.channels, self.pred_len, self.seq_len)
+        super().__init__(training_config, self.channels, self.pred_len, self.seq_len, flatten=False)
 
     def _setup_encoder(self) -> nn.Module:
         """
@@ -66,5 +92,7 @@ class AnomalyPredictionBertLightning(AnomalyPredictionModule):
         """
         Fully Connected Network classifier.
         """
-        # Initialize activations
         return nn.Identity()
+        """hidden_dim = int(self.hidden_dim_rate * self.d_embed)
+        num_patches = self.seq_len // self.patch_size
+        return OutputProjection(num_patches, self.d_embed, hidden_dim, self.pred_len, self.channels)"""
