@@ -55,7 +55,13 @@ class CPatchTSTLightning(AnomalyPredictionModule):
         """
         PatchTST encoder with Graph Correlation Encoder and CAMSA attention..
         """
-        graph_encoder = GraphCorrelationEncoder(self.model_config)
+        graph_encoder = GraphCorrelationEncoder(
+            dropout=self.model_config.get_param('graph.encoder.dropout', v_type=float),
+            embedding_size=self.model_config.get_param('graph.projector.embedding_size', v_type=int),
+            hidden_layers_sizes=self.model_config.get_collection('graph.encoder.hidden_sizes', v_type=int),
+            input_features=self.model_config.get_param('data.enc_in', v_type=int),
+            num_nodes=self.model_config.get_param('data.enc_in', v_type=int),
+        )
         init_gcn_weights(graph_encoder)
         camsa_patch_tst = CAMSAPatchTST(self.model_config)
         init_transformer_encoder_weights(camsa_patch_tst)
